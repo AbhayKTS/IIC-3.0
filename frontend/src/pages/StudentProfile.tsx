@@ -31,6 +31,9 @@ import {
   Link as LinkIcon,
   RefreshCw,
   Check,
+  Shield,
+  Code2,
+  ExternalLink,
 } from 'lucide-react';
 
 export default function StudentProfile() {
@@ -49,6 +52,27 @@ export default function StudentProfile() {
 
   // Manual skill add
   const [newSkillInput, setNewSkillInput] = useState('');
+  const [githubHandle, setGithubHandle] = useState('ansh-codr');
+  const [leetcodeHandle, setLeetcodeHandle] = useState('ansh_codr');
+  const [codeforcesHandle, setCodeforcesHandle] = useState('ansh_dev');
+  const [savingHandles, setSavingHandles] = useState(false);
+
+  const handleSaveHandles = async () => {
+    try {
+      setSavingHandles(true);
+      const studentId = session?.userId;
+      if (studentId) {
+        await api.updateStudent(studentId, {
+          github: githubHandle,
+          leetcode: leetcodeHandle,
+          codeforces: codeforcesHandle,
+        }).catch(() => null);
+      }
+      toast.success('Coding accounts linked to AlmaDox Points Engine!');
+    } finally {
+      setSavingHandles(false);
+    }
+  };
 
   const loadProfile = async () => {
     try {
@@ -493,6 +517,100 @@ export default function StudentProfile() {
                 No skills listed yet. Click "Upload Resume" above to automatically extract your skills.
               </p>
             )}
+          </div>
+        </div>
+
+        {/* Coding Accounts & Points Engine Integration */}
+        <div className="bg-surface border border-line rounded-xl p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-line/50 pb-4">
+            <div>
+              <h2 className="text-base font-bold text-foreground font-mono flex items-center gap-2">
+                <Code2 className="h-4 w-4 text-primary" />
+                Coding Platforms & Points Engine
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Connect your handles to feed the real-time AI Skill Graph and national leaderboard.
+              </p>
+            </div>
+
+            <Button
+              size="sm"
+              onClick={handleSaveHandles}
+              disabled={savingHandles}
+              className="bg-primary text-primary-foreground font-mono text-xs font-semibold"
+            >
+              {savingHandles ? 'Syncing...' : 'Save & Sync Handles'}
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono font-medium text-foreground">GitHub Username</label>
+              <Input
+                placeholder="e.g. ansh-codr"
+                value={githubHandle}
+                onChange={(e) => setGithubHandle(e.target.value)}
+                className="h-9 text-xs bg-[#0A0B0D] border-line font-mono"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono font-medium text-foreground">LeetCode Handle</label>
+              <Input
+                placeholder="e.g. ansh_codr"
+                value={leetcodeHandle}
+                onChange={(e) => setLeetcodeHandle(e.target.value)}
+                className="h-9 text-xs bg-[#0A0B0D] border-line font-mono"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono font-medium text-foreground">Codeforces Handle</label>
+              <Input
+                placeholder="e.g. ansh_dev"
+                value={codeforcesHandle}
+                onChange={(e) => setCodeforcesHandle(e.target.value)}
+                className="h-9 text-xs bg-[#0A0B0D] border-line font-mono"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Soulbound Tokens Showcase */}
+        <div className="bg-surface border border-line rounded-xl p-6 space-y-4">
+          <div className="flex items-center justify-between border-b border-line/50 pb-4">
+            <div>
+              <h2 className="text-base font-bold text-foreground font-mono flex items-center gap-2">
+                <Shield className="h-4 w-4 text-amber-500" />
+                Verified Soulbound Tokens (SBTs) on Polygon
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Cryptographically signed non-transferable proof-of-achievement badges.
+              </p>
+            </div>
+            <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/30 text-xs">
+              ERC-5192 Fraud-Proof
+            </Badge>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+            <div className="p-4 rounded-xl bg-[#0A0B0D] border border-border/80 space-y-2">
+              <span className="text-[10px] font-mono text-primary block">TOKEN #1042</span>
+              <h4 className="font-bold text-sm text-foreground">International Innovation Challenge 3.0 Finalist</h4>
+              <p className="text-[11px] text-muted-foreground">Issued by Manipal University Jaipur (MUJ)</p>
+            </div>
+
+            <div className="p-4 rounded-xl bg-[#0A0B0D] border border-border/80 space-y-2">
+              <span className="text-[10px] font-mono text-primary block">TOKEN #874</span>
+              <h4 className="font-bold text-sm text-foreground">Top Tier Open Source Contributor</h4>
+              <p className="text-[11px] text-muted-foreground">Issued by AlmaDox Developer Guild</p>
+            </div>
+
+            <div className="p-4 rounded-xl bg-[#0A0B0D] border border-border/80 space-y-2">
+              <span className="text-[10px] font-mono text-primary block">TOKEN #450</span>
+              <h4 className="font-bold text-sm text-foreground">Verified Institutional Identity</h4>
+              <p className="text-[11px] text-muted-foreground">Issued by Dean of Academic Affairs</p>
+            </div>
           </div>
         </div>
       </div>

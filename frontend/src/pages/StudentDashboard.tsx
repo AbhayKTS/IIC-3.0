@@ -33,6 +33,12 @@ import {
   RefreshCw,
   ChevronRight,
   UserCheck,
+  Wallet,
+  Zap,
+  Trophy,
+  Coins,
+  Award,
+  Lock,
 } from 'lucide-react';
 
 interface StudentOverviewData {
@@ -381,6 +387,122 @@ export default function StudentDashboard() {
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
+              </div>
+            </div>
+
+            {/* ALMADOX PROTOCOL ROW: WEB3 WALLET + MICRO-GIGS + AI POINTS ENGINE */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* 1. Custodial Polygon Wallet & SBTs */}
+              <div className="glass-card p-6 rounded-xl border border-border/80 flex flex-col justify-between space-y-4 hover:border-violet-500/40 transition-all">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-violet-400 font-semibold text-sm">
+                      <Wallet className="h-4 w-4" /> Polygon Custodial Wallet
+                    </div>
+                    <Badge variant="outline" className="text-[10px] border-violet-500/30 text-violet-400 font-mono">
+                      ERC-4337
+                    </Badge>
+                  </div>
+                  <div>
+                    <span className="text-2xl font-extrabold text-foreground block">$300.00 USDC</span>
+                    <span className="text-xs text-muted-foreground">≈ ₹25,800 INR (Off-ramp ready)</span>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-secondary/40 text-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Minted SBT Badges:</span>
+                      <strong className="text-foreground">3 Soulbound Tokens</strong>
+                    </div>
+                    <div className="flex items-center gap-1 text-[11px] text-emerald-500">
+                      <CheckCircle2 className="h-3 w-3" /> Fraud-Proof Credentials on Polygon
+                    </div>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => navigate('/student/wallet')}
+                  className="w-full justify-between group text-xs"
+                >
+                  <span>Manage Wallet & SBTs</span>
+                  <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+                </Button>
+              </div>
+
+              {/* 2. Paid Micro-Gigs & Portfolio */}
+              <div className="glass-card p-6 rounded-xl border border-border/80 flex flex-col justify-between space-y-4 hover:border-amber-500/40 transition-all">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-amber-500 font-semibold text-sm">
+                      <Zap className="h-4 w-4" /> Paid Micro-Gigs
+                    </div>
+                    <Badge className="bg-amber-500/10 text-amber-500 text-[10px]">
+                      Proof-of-Work
+                    </Badge>
+                  </div>
+                  <div>
+                    <span className="text-2xl font-extrabold text-foreground block">4 Active Gigs</span>
+                    <span className="text-xs text-muted-foreground">Bounties from $120 to $250 USDC</span>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-secondary/40 text-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Deliverable Rating:</span>
+                      <strong className="text-amber-500 font-bold">4.9 / 5.0 ⭐</strong>
+                    </div>
+                    <div className="text-[11px] text-muted-foreground truncate">
+                      Build verified work portfolio, not just a resume
+                    </div>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => navigate('/student/microgigs')}
+                  className="w-full justify-between group text-xs"
+                >
+                  <span>Browse Paid Gigs</span>
+                  <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+                </Button>
+              </div>
+
+              {/* 3. Live AI Skill Points Engine */}
+              <div className="glass-card p-6 rounded-xl border border-border/80 flex flex-col justify-between space-y-4 hover:border-primary/40 transition-all">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-primary font-semibold text-sm">
+                      <Trophy className="h-4 w-4" /> Skill Graph & Points
+                    </div>
+                    <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
+                      Rank #1
+                    </Badge>
+                  </div>
+                  <div>
+                    <span className="text-2xl font-extrabold text-primary block">3,840 Points</span>
+                    <span className="text-xs text-muted-foreground">Grandmaster Coding Tier</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 text-center text-[11px] pt-1">
+                    <div className="p-1.5 rounded bg-secondary/30">
+                      <span className="text-[10px] text-muted-foreground block">LeetCode</span>
+                      <strong className="text-foreground">720+</strong>
+                    </div>
+                    <div className="p-1.5 rounded bg-secondary/30">
+                      <span className="text-[10px] text-muted-foreground block">Codeforces</span>
+                      <strong className="text-foreground">1980</strong>
+                    </div>
+                    <div className="p-1.5 rounded bg-secondary/30">
+                      <span className="text-[10px] text-muted-foreground block">GitHub</span>
+                      <strong className="text-foreground">480</strong>
+                    </div>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => navigate('/student/leaderboard')}
+                  className="w-full justify-between group text-xs"
+                >
+                  <span>View Tech Leaderboard</span>
+                  <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+                </Button>
               </div>
             </div>
 
