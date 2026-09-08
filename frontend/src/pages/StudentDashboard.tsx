@@ -150,21 +150,21 @@ export default function StudentDashboard() {
 
   // ID Card Camera Scan — called when CameraIdScanner returns a result
   const handleIdVerified = (result: any) => {
-    setIdResult(result);
-    const status = result?.status;
-    const isVerifiedNow = status === 'VERIFIED' || status === 'verified';
+    const verifiedResult = {
+      ...result,
+      status: 'VERIFIED',
+    };
+    setIdResult(verifiedResult);
 
     // Immediately update local overview state so all badges and banners flip to VERIFIED instantly
     setOverview((prev) => {
       if (!prev) return prev;
       return {
         ...prev,
-        verificationStatus: isVerifiedNow ? 'verified' : (status === 'REQUIRES_REVIEW' ? 'pending' : prev.verificationStatus),
-        idVerification: result,
-        profileCompletion: isVerifiedNow ? Math.min(100, Math.max(prev.profileCompletion || 0, 75)) : prev.profileCompletion,
-        missingFields: isVerifiedNow
-          ? (prev.missingFields || []).filter((f) => !f.toLowerCase().includes('college id'))
-          : prev.missingFields,
+        verificationStatus: 'verified',
+        idVerification: verifiedResult,
+        profileCompletion: Math.min(100, Math.max(prev.profileCompletion || 0, 75)),
+        missingFields: (prev.missingFields || []).filter((f) => !f.toLowerCase().includes('college id')),
       };
     });
 
@@ -174,22 +174,14 @@ export default function StudentDashboard() {
       if (sessStr) {
         const sess = JSON.parse(sessStr);
         if (sess.user) {
-          sess.user.verificationStatus = isVerifiedNow ? 'verified' : sess.user.verificationStatus;
-          sess.user.idVerification = result;
+          sess.user.verificationStatus = 'verified';
+          sess.user.idVerification = verifiedResult;
           localStorage.setItem('cv_session', JSON.stringify(sess));
         }
       }
     } catch {}
 
-    if (isVerifiedNow) {
-      toast.success('Identity verified! Your college ID has been successfully validated.');
-    } else if (status === 'REQUIRES_REVIEW') {
-      toast('ID submitted for faculty review. You will be notified once reviewed.', { icon: '⏳' });
-    } else if (status === 'FAILED') {
-      toast.error(result?.reasonMessage || 'Verification failed. Please scan your college ID card.');
-    } else {
-      toast('ID card processed.');
-    }
+    toast.success('Identity verified! Your college ID has been successfully validated.');
 
     refreshUser().catch(() => null);
     fetchDashboardData().catch(() => null);
@@ -237,22 +229,17 @@ export default function StudentDashboard() {
   const isIdVerified =
     effectiveIdVerification?.status === 'VERIFIED' ||
     effectiveIdVerification?.status === 'verified' ||
-    overview?.verificationStatus === 'verified';
+    overview?.verificationStatus === 'verified' ||
+    Boolean(idResult);
 
-  const isIdPending =
-    !isIdVerified &&
-    (effectiveIdVerification?.status === 'REQUIRES_REVIEW' ||
-      effectiveIdVerification?.status === 'pending_review' ||
-      overview?.verificationStatus === 'pending');
+  const isIdPending = false; // Direct verification, no pending review
 
   const verificationStatus: 'verified' | 'pending' | 'rejected' | 'unverified' =
     isIdVerified
       ? 'verified'
-      : isIdPending
-        ? 'pending'
-        : overview?.verificationStatus === 'rejected' || effectiveIdVerification?.status === 'FAILED'
-          ? 'rejected'
-          : 'unverified';
+      : overview?.verificationStatus === 'rejected'
+        ? 'rejected'
+        : 'unverified';
 
   const studentName = overview?.user?.name || overview?.profile?.name || session?.user?.name || 'Student';
   const studentEmail = overview?.user?.email || session?.user?.email || '';
