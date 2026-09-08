@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRealtimeSync } from '@/lib/realtimeSync';
+import RealtimeStudentRoster from '@/components/RealtimeStudentRoster';
 import {
   Briefcase,
   Users,
@@ -680,6 +681,15 @@ export default function RecruiterProfile() {
             </div>
           </div>
         </form>
+
+        {/* Real-time Student Candidates Roster (Live Firestore Sync) */}
+        <RealtimeStudentRoster
+          role="recruiter"
+          targetSkills={recruiter.targetSkills}
+          onShortlistCandidate={() => {
+            handleCounterChange('shortlistedCount', 1);
+          }}
+        />
 
         {/* Proof-of-Work Guarantee */}
         <div className="p-5 rounded-2xl bg-secondary/30 border border-border/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">

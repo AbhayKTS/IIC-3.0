@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRealtimeSync, broadcastRealtimeUpdate } from '@/lib/realtimeSync';
+import RealtimeStudentRoster from '@/components/RealtimeStudentRoster';
 import {
   Building2,
   Users,
@@ -694,6 +695,12 @@ export default function CollegeProfile() {
             </div>
           </div>
         </form>
+
+        {/* Real-time Student Profiles Directory (Live Firestore Sync) */}
+        <RealtimeStudentRoster
+          role="faculty"
+          collegeId={college.id}
+        />
 
         {/* Assigned Faculty Administrator Identity Card */}
         <div className="p-5 rounded-2xl bg-secondary/30 border border-border/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">

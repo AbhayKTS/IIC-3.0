@@ -100,15 +100,46 @@ module.exports = {
   // Students
   async listStudents(req, res, next) {
     try {
+      const { collegeId } = req.query || {};
       const students = await listDocs('students');
-      return ok(res, students);
+
+      let userStudents = [];
+      try {
+        const usersSnap = await db.collection('users').where('role', '==', 'student').get();
+        userStudents = usersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      } catch (_) {}
+
+      const map = new Map();
+      for (const s of students) {
+        const key = s.id || s.email;
+        if (key) map.set(key, s);
+      }
+      for (const u of userStudents) {
+        const key = u.id || u.uid || u.email;
+        if (key) {
+          const existing = map.get(key) || {};
+          map.set(key, { ...existing, ...u });
+        }
+      }
+
+      let all = Array.from(map.values());
+      if (collegeId) {
+        all = all.filter((s) => s.collegeId === collegeId);
+      }
+      return ok(res, all);
     } catch (error) {
       return next(error);
     }
   },
   async getStudent(req, res, next) {
     try {
-      const student = await getDoc('students', req.params.id);
+      let student = await getDoc('students', req.params.id);
+      if (!student) {
+        student = await getDoc('users', req.params.id);
+      }
+      if (!student) {
+        student = await getDoc('studentProfiles', req.params.id);
+      }
       return ok(res, student);
     } catch (error) {
       return next(error);
@@ -116,7 +147,11 @@ module.exports = {
   },
   async updateStudent(req, res, next) {
     try {
-      const updated = await updateDoc('students', req.params.id, req.body || {});
+      const id = req.params.id;
+      const data = { ...(req.body || {}), updatedAt: new Date().toISOString() };
+      const updated = await updateDoc('students', id, data);
+      await updateDoc('users', id, data).catch(() => null);
+      await updateDoc('studentProfiles', id, data).catch(() => null);
       return ok(res, updated);
     } catch (error) {
       return next(error);
@@ -125,7 +160,24 @@ module.exports = {
   async listVerifiedStudents(req, res, next) {
     try {
       const students = await listDocs('students', { field: 'verificationStatus', value: 'verified' });
-      return ok(res, students);
+      let userStudents = [];
+      try {
+        const usersSnap = await db.collection('users').where('role', '==', 'student').where('verificationStatus', '==', 'verified').get();
+        userStudents = usersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      } catch (_) {}
+
+      const map = new Map();
+      for (const s of students) {
+        if (s.id || s.email) map.set(s.id || s.email, s);
+      }
+      for (const u of userStudents) {
+        const key = u.id || u.uid || u.email;
+        if (key) {
+          const existing = map.get(key) || {};
+          map.set(key, { ...existing, ...u });
+        }
+      }
+      return ok(res, Array.from(map.values()));
     } catch (error) {
       return next(error);
     }
@@ -134,10 +186,29 @@ module.exports = {
     try {
       const { collegeId } = req.query || {};
       let students = await listDocs('students', { field: 'verificationStatus', value: 'pending' });
-      if (collegeId) {
-        students = students.filter((s) => s.collegeId === collegeId);
+      let userStudents = [];
+      try {
+        const snap = await db.collection('users').where('role', '==', 'student').where('verificationStatus', '==', 'pending').get();
+        userStudents = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      } catch (_) {}
+
+      const map = new Map();
+      for (const s of students) {
+        if (s.id || s.email) map.set(s.id || s.email, s);
       }
-      return ok(res, students);
+      for (const u of userStudents) {
+        const key = u.id || u.uid || u.email;
+        if (key) {
+          const existing = map.get(key) || {};
+          map.set(key, { ...existing, ...u });
+        }
+      }
+
+      let all = Array.from(map.values());
+      if (collegeId) {
+        all = all.filter((s) => s.collegeId === collegeId);
+      }
+      return ok(res, all);
     } catch (error) {
       return next(error);
     }
@@ -146,6 +217,8 @@ module.exports = {
     try {
       const { id } = req.params;
       const updated = await updateDoc('students', id, { verificationStatus: 'verified' });
+      await updateDoc('users', id, { verificationStatus: 'verified' }).catch(() => null);
+      await updateDoc('studentProfiles', id, { verificationStatus: 'verified' }).catch(() => null);
       return ok(res, updated);
     } catch (error) {
       return next(error);
@@ -155,6 +228,8 @@ module.exports = {
     try {
       const { id } = req.params;
       const updated = await updateDoc('students', id, { verificationStatus: 'rejected' });
+      await updateDoc('users', id, { verificationStatus: 'rejected' }).catch(() => null);
+      await updateDoc('studentProfiles', id, { verificationStatus: 'rejected' }).catch(() => null);
       return ok(res, updated);
     } catch (error) {
       return next(error);
@@ -872,9 +947,10 @@ module.exports = {
           return ok(res, { id: existing.docs[0].id, ...existing.docs[0].data() });
         }
 
-        const doc = await createDoc('students', {
+        const studentPayload = {
           name,
           email,
+          role: 'student',
           password: password || '',
           collegeId: resolvedCollegeId,
           verificationStatus: 'pending',
@@ -884,7 +960,13 @@ module.exports = {
           achievements: [],
           certificates: [],
           bio: '',
-        });
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        const doc = await createDoc('students', studentPayload);
+        await db.collection('users').doc(doc.id).set(studentPayload, { merge: true }).catch(() => null);
+        await db.collection('studentProfiles').doc(doc.id).set(studentPayload, { merge: true }).catch(() => null);
         return ok(res, doc);
       }
 

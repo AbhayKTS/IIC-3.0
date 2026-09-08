@@ -5,6 +5,7 @@ import type { Student, ResumeExtractionData, ExtractedSkill } from '@/lib/types'
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
@@ -57,6 +58,32 @@ export default function StudentProfile() {
   const [codeforcesHandle, setCodeforcesHandle] = useState('ansh_dev');
   const [savingHandles, setSavingHandles] = useState(false);
 
+  // Basic Info Edit State
+  const [isEditDetailsOpen, setIsEditDetailsOpen] = useState(false);
+  const [studentName, setStudentName] = useState('');
+  const [studentBio, setStudentBio] = useState('');
+  const [savingDetails, setSavingDetails] = useState(false);
+
+  const handleSaveDetails = async () => {
+    try {
+      setSavingDetails(true);
+      const studentId = session?.userId;
+      if (studentId) {
+        await api.updateStudent(studentId, {
+          name: studentName.trim(),
+          bio: studentBio.trim(),
+        });
+        setProfile((prev) => (prev ? { ...prev, name: studentName.trim(), bio: studentBio.trim() } : null));
+        setIsEditDetailsOpen(false);
+        toast.success('Profile details saved & real-time synced to College & Recruiter portals!');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update profile details');
+    } finally {
+      setSavingDetails(false);
+    }
+  };
+
   const handleSaveHandles = async () => {
     try {
       setSavingHandles(true);
@@ -91,6 +118,8 @@ export default function StudentProfile() {
         const data = await api.getStudentById(studentId);
         if (data) {
           setProfile(data);
+          if (data.name) setStudentName(data.name);
+          if (data.bio) setStudentBio(data.bio);
           if (data.github) setGithubHandle(data.github);
           if (data.leetcode) setLeetcodeHandle(data.leetcode);
           if (data.codeforces) setCodeforcesHandle(data.codeforces);
@@ -260,17 +289,85 @@ export default function StudentProfile() {
                 <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
                   <span>College: <strong className="text-foreground font-mono">{profile?.collegeId?.toUpperCase() || 'IITD'}</strong></span>
                 </div>
+                {profile?.bio && (
+                  <p className="text-xs text-foreground/80 mt-1 max-w-md line-clamp-2 italic">
+                    "{profile.bio}"
+                  </p>
+                )}
               </div>
             </div>
 
-            {/* Resume Upload CTA */}
-            <Dialog open={isResumeOpen} onOpenChange={setIsResumeOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-[#3DDC84] text-black hover:bg-[#34c775] font-mono text-xs font-semibold px-4 gap-2">
-                  <Sparkles className="h-4 w-4" />
-                  Upload Resume (AI Parse)
-                </Button>
-              </DialogTrigger>
+            <div className="flex items-center gap-2">
+              {/* Edit Details Dialog */}
+              <Dialog open={isEditDetailsOpen} onOpenChange={setIsEditDetailsOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="border-line font-mono text-xs gap-2">
+                    <User className="h-3.5 w-3.5" />
+                    Edit Profile
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="bg-[#14161A] border-[#2A2D33] text-[#F2F3F5] max-w-md">
+                  <DialogHeader>
+                    <DialogTitle className="text-base font-bold flex items-center gap-2 font-mono">
+                      <User className="h-4 w-4 text-primary" />
+                      Edit Student Details
+                    </DialogTitle>
+                    <DialogDescription className="text-xs text-[#8A8F98]">
+                      Changes are saved directly to Firestore and synced across College and Recruiter portals in real-time.
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <div className="space-y-3 mt-2">
+                    <div className="space-y-1">
+                      <label className="text-xs font-mono text-foreground font-medium">Full Name</label>
+                      <Input
+                        value={studentName}
+                        onChange={(e) => setStudentName(e.target.value)}
+                        placeholder="Your Full Name"
+                        className="bg-[#0A0B0D] border-line text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-mono text-foreground font-medium">Bio / Summary</label>
+                      <Textarea
+                        rows={3}
+                        value={studentBio}
+                        onChange={(e) => setStudentBio(e.target.value)}
+                        placeholder="e.g. Full-Stack Engineer passionate about distributed systems and Web3..."
+                        className="bg-[#0A0B0D] border-line text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-[#2A2D33]">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsEditDetailsOpen(false)}
+                      className="font-mono text-xs"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleSaveDetails}
+                      disabled={savingDetails}
+                      className="bg-primary text-primary-foreground font-mono text-xs font-semibold"
+                    >
+                      {savingDetails ? 'Saving...' : 'Save & Sync Live'}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              {/* Resume Upload CTA */}
+              <Dialog open={isResumeOpen} onOpenChange={setIsResumeOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-[#3DDC84] text-black hover:bg-[#34c775] font-mono text-xs font-semibold px-4 gap-2">
+                    <Sparkles className="h-4 w-4" />
+                    Upload Resume (AI Parse)
+                  </Button>
+                </DialogTrigger>
               <DialogContent className="bg-[#14161A] border-[#2A2D33] text-[#F2F3F5] max-w-2xl max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle className="text-lg font-bold flex items-center gap-2 font-mono">
@@ -488,6 +585,7 @@ export default function StudentProfile() {
             </Dialog>
           </div>
         </div>
+      </div>
 
         {/* Skills Management Section */}
         <div className="bg-surface border border-line rounded-xl p-6 space-y-4">

@@ -7,6 +7,7 @@ import type {
 import { auth, db } from './firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { broadcastRealtimeUpdate } from './realtimeSync';
 
 const getApiBase = () => {
   const envUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL;
@@ -297,7 +298,21 @@ export const api = {
     return request(`/compat/students/${id}`);
   },
   async updateStudent(id: string, data: Partial<Student>): Promise<Student> {
-    return request(`/compat/students/${id}`, { method: 'PUT', body: data });
+    try {
+      if (db && id) {
+        await setDoc(doc(db, 'users', id), data, { merge: true }).catch(() => null);
+        await setDoc(doc(db, 'students', id), data, { merge: true }).catch(() => null);
+      }
+    } catch (e) {
+      console.warn('Direct Firestore student write warning:', e);
+    }
+    broadcastRealtimeUpdate({
+      type: 'student:updated',
+      entityType: 'student',
+      entityId: id,
+      data,
+    });
+    return request(`/compat/students/${id}`, { method: 'PUT', body: data }).catch(() => data as Student);
   },
   async getVerifiedStudents(): Promise<Student[]> {
     return request('/compat/students/verified');
@@ -328,11 +343,36 @@ export const api = {
     return request('/student/coding-profiles', { auth: true });
   },
   async updateCodingProfiles(data: { leetcodeUsername?: string; codeforcesHandle?: string }): Promise<{ codingProfiles: CodingProfiles }> {
-    return request('/student/coding-profiles', {
+    const res = await request('/student/coding-profiles', {
       method: 'PUT',
       body: data,
       auth: true,
     });
+    const session = JSON.parse(localStorage.getItem('cv_session') || '{}');
+    const studentId = session?.userId;
+    if (studentId) {
+      try {
+        if (db) {
+          const profileData: any = {};
+          if (data.leetcodeUsername) profileData.leetcode = data.leetcodeUsername;
+          if (data.codeforcesHandle) profileData.codeforces = data.codeforcesHandle;
+          await setDoc(doc(db, 'users', studentId), profileData, { merge: true }).catch(() => null);
+          await setDoc(doc(db, 'students', studentId), profileData, { merge: true }).catch(() => null);
+        }
+      } catch (e) {
+        console.warn('Direct Firestore coding profile update warning:', e);
+      }
+      broadcastRealtimeUpdate({
+        type: 'student:updated',
+        entityType: 'student',
+        entityId: studentId,
+        data: {
+          leetcode: data.leetcodeUsername,
+          codeforces: data.codeforcesHandle,
+        },
+      });
+    }
+    return res;
   },
   async refreshCodingProfiles(): Promise<{ codingProfiles: CodingProfiles }> {
     return request('/student/coding-profiles/refresh', {
@@ -412,12 +452,28 @@ export const api = {
 
   async updateStudentSkills(skills: string[]): Promise<Student> {
     const session = JSON.parse(localStorage.getItem('cv_session') || '{}');
-    const studentId = session.userId;
+    const studentId = session?.userId;
+    if (studentId) {
+      try {
+        if (db) {
+          await setDoc(doc(db, 'users', studentId), { skills }, { merge: true }).catch(() => null);
+          await setDoc(doc(db, 'students', studentId), { skills }, { merge: true }).catch(() => null);
+        }
+      } catch (e) {
+        console.warn('Direct Firestore skill update warning:', e);
+      }
+      broadcastRealtimeUpdate({
+        type: 'student:updated',
+        entityType: 'student',
+        entityId: studentId,
+        data: { skills },
+      });
+    }
     return request(`/compat/students/${studentId}`, {
       method: 'PUT',
       body: { skills },
       auth: true,
-    });
+    }).catch(() => ({ skills } as any));
   },
 
   // Wallet

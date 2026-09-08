@@ -3,6 +3,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/mockApi';
 import { Button } from '@/components/ui/button';
+import RealtimeStudentRoster from '@/components/RealtimeStudentRoster';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -219,6 +220,12 @@ export default function CollegeDashboard() {
             </Button>
           </div>
         </div>
+
+        {/* Real-time Student Roster (Live Firestore) */}
+        <RealtimeStudentRoster
+          role="faculty"
+          collegeId={(session?.user as any)?.collegeId || (session?.user as any)?.college?.id || 'c1'}
+        />
       </div>
     </DashboardLayout>
   );

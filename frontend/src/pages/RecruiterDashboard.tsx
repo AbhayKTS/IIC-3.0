@@ -2,6 +2,7 @@ import React from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
+import RealtimeStudentRoster from '@/components/RealtimeStudentRoster';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -154,6 +155,9 @@ export default function RecruiterDashboard() {
             </Button>
           </div>
         </div>
+
+        {/* Real-time Student Candidates Roster (Live Firestore) */}
+        <RealtimeStudentRoster role="recruiter" />
       </div>
     </DashboardLayout>
   );
