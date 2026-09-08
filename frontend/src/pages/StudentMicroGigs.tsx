@@ -7,31 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import {
-  Zap,
-  Search,
-  DollarSign,
-  Clock,
-  Briefcase,
-  CheckCircle2,
-  ExternalLink,
-  Award,
-  Filter,
-  Layers,
-  Send,
-  Building,
-  Star,
-  Coins,
-  ShieldCheck,
+  Zap, Search, DollarSign, Clock, Briefcase, CheckCircle2,
+  ExternalLink, Award, Filter, Layers, Send, Building, Star, Coins, ShieldCheck,
 } from 'lucide-react';
+import { generateWalletFromSeed, simulateGigPayout, explorerTxUrl, saveTxRecord } from '@/lib/web3';
 
 const INITIAL_SEED_GIGS: Gig[] = [
   {
@@ -95,6 +78,12 @@ const INITIAL_SEED_GIGS: Gig[] = [
 export default function StudentMicroGigs() {
   const { session } = useAuth();
   const studentId = session?.userId || 'student';
+  const [walletAddress, setWalletAddress] = useState('');
+
+  useEffect(() => {
+    const wallet = generateWalletFromSeed(studentId);
+    setWalletAddress(wallet.address);
+  }, [studentId]);
 
   const [gigs, setGigs] = useState<Gig[]>(INITIAL_SEED_GIGS);
   const [applications, setApplications] = useState<GigApplication[]>([]);
@@ -115,6 +104,7 @@ export default function StudentMicroGigs() {
   const [deliverableUrl, setDeliverableUrl] = useState('');
   const [deliverableNotes, setDeliverableNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [lastTxHash, setLastTxHash] = useState('');
 
   useEffect(() => {
     loadGigsAndApps();
@@ -184,13 +174,38 @@ export default function StudentMicroGigs() {
         await api.completeGig(app.id, studentId, gig?.title || 'Micro-Gig').catch(() => null);
       }
 
+      // Simulate Web3 payout to student's Polygon wallet
+      const rewardUSDC = gig?.reward || 150;
+      const payout = await simulateGigPayout(walletAddress || '0x0', rewardUSDC);
+      setLastTxHash(payout.txHash);
+      
+      // Save tx to local history log
+      saveTxRecord({
+        hash: payout.txHash,
+        type: 'GIG_PAYOUT',
+        label: `MicroGig Reward: ${gig?.title || 'Task'}`,
+        amount: payout.amountPOL,
+        timestamp: Date.now(),
+        status: 'confirmed',
+        network: 'Polygon Amoy Testnet',
+      });
+
       setApplications((prev) =>
         prev.map((a) =>
           a.gigId === submittingGigId ? { ...a, status: 'completed' } : a
         )
       );
 
-      toast.success('Deliverable submitted successfully! Polygon smart contract payment escrow is pending recruiter rating.');
+      toast.success(
+        `✅ Deliverable submitted! ${payout.amountPOL} POL ($${rewardUSDC} USDC) sent to your Polygon wallet.`,
+        {
+          duration: 8000,
+          action: {
+            label: 'View Tx',
+            onClick: () => window.open(explorerTxUrl(payout.txHash), '_blank'),
+          },
+        }
+      );
       setSubmitModalOpen(false);
       setDeliverableUrl('');
       setDeliverableNotes('');
@@ -353,9 +368,10 @@ export default function StudentMicroGigs() {
                         </h3>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <div className="text-lg font-extrabold text-emerald-500 flex items-center gap-0.5 justify-end">
-                          <Coins className="h-4 w-4" /> ${gig.reward}
+                        <div className="text-base font-extrabold text-emerald-500 flex items-center gap-0.5 justify-end">
+                          <Coins className="h-4 w-4" /> ${gig.reward} USDC
                         </div>
+                        <div className="text-[11px] text-violet-500 font-semibold">{(gig.reward * 0.8).toFixed(2)} POL</div>
                         <span className="text-[11px] text-muted-foreground">≈ ₹{gig.reward * 86}</span>
                       </div>
                     </div>
@@ -502,7 +518,7 @@ export default function StudentMicroGigs() {
                         </div>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Deliverable accepted. Settlement payout of ${gig?.reward || 150} USDC completed on Polygon network.
+                        Deliverable accepted. Payout of <strong className="text-emerald-500">${gig?.reward || 150} USDC ({((gig?.reward || 150) * 0.8).toFixed(2)} POL)</strong> sent to your Polygon Amoy wallet.
                       </p>
                     </div>
                   );

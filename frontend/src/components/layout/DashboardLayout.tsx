@@ -2,9 +2,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import type { UserRole } from '@/lib/types';
 import {
-  LayoutDashboard, User, Trophy, Calendar, Briefcase, Users, MessageSquare,
-  Wallet, ShoppingBag, Zap, Swords, Shield, Bell, BarChart3, UserCheck,
-  Search, ListChecks, FileText, LogOut, GraduationCap, ChevronLeft, Menu, X, Settings
+  LayoutDashboard, User, Trophy, Briefcase,
+  Wallet, Zap, Shield, LogOut, ChevronLeft, Menu, Layers
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -14,28 +13,19 @@ const studentNav: NavItem[] = [
   { label: 'Dashboard', href: '/student/dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
   { label: 'Profile', href: '/student/profile', icon: <User className="h-4 w-4" /> },
   { label: 'Leaderboard', href: '/student/leaderboard', icon: <Trophy className="h-4 w-4" /> },
-  { label: 'Events', href: '/student/events', icon: <Calendar className="h-4 w-4" /> },
-  { label: 'Placements', href: '/student/placements', icon: <Briefcase className="h-4 w-4" /> },
-  { label: 'Wallet', href: '/student/wallet', icon: <Wallet className="h-4 w-4" /> },
+  { label: 'Wallet & SBTs', href: '/student/wallet', icon: <Wallet className="h-4 w-4" /> },
+  { label: 'Transactions', href: '/student/transactions', icon: <Layers className="h-4 w-4" /> },
   { label: 'MicroGigs', href: '/student/microgigs', icon: <Zap className="h-4 w-4" /> },
-  { label: 'Marketplace', href: '/student/marketplace', icon: <ShoppingBag className="h-4 w-4" /> },
 ];
 
 const collegeNav: NavItem[] = [
   { label: 'Dashboard', href: '/college/dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
-  { label: 'Verification', href: '/college/verification', icon: <UserCheck className="h-4 w-4" /> },
-  { label: 'Notices', href: '/college/notices', icon: <Bell className="h-4 w-4" /> },
-  { label: 'Events', href: '/college/events', icon: <Calendar className="h-4 w-4" /> },
-  { label: 'Analytics', href: '/college/analytics', icon: <BarChart3 className="h-4 w-4" /> },
+  { label: 'Verification', href: '/college/verification', icon: <Shield className="h-4 w-4" /> },
   { label: 'Recruiters', href: '/college/recruiters', icon: <Briefcase className="h-4 w-4" /> },
-  { label: 'Marketplace Mod', href: '/college/marketplace-moderation', icon: <ShoppingBag className="h-4 w-4" /> },
 ];
 
 const recruiterNav: NavItem[] = [
   { label: 'Dashboard', href: '/recruiter/dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
-  { label: 'Search', href: '/recruiter/search', icon: <Search className="h-4 w-4" /> },
-  { label: 'Shortlist', href: '/recruiter/shortlist', icon: <ListChecks className="h-4 w-4" /> },
-  { label: 'Tests', href: '/recruiter/tests', icon: <FileText className="h-4 w-4" /> },
   { label: 'MicroGigs', href: '/recruiter/microgigs', icon: <Zap className="h-4 w-4" /> },
 ];
 
@@ -52,9 +42,11 @@ export default function DashboardLayout({ role, children }: { role: UserRole; ch
   const sidebarContent = (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b border-border/50 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2">
-          <GraduationCap className="h-6 w-6 text-primary" />
-          {!collapsed && <span className="gradient-text font-bold">CollegeVerse</span>}
+        <Link to="/" className="flex items-center gap-2" style={{ fontFamily: '"Fraunces", serif', letterSpacing: '-0.02em' }}>
+          <div className="flex items-center justify-center size-8 rounded-full bg-primary/10 text-primary font-bold">
+            A
+          </div>
+          {!collapsed && <span className="font-bold text-foreground text-xl">Almadox</span>}
         </Link>
         <button onClick={() => setCollapsed(!collapsed)} className="hidden lg:block text-muted-foreground hover:text-foreground">
           <ChevronLeft className={`h-4 w-4 transition-transform ${collapsed ? 'rotate-180' : ''}`} />

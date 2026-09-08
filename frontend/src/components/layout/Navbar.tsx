@@ -16,7 +16,6 @@ export default function Navbar() {
     { label: 'Colleges', href: '/colleges' },
     { label: 'Leaderboard', href: '/leaderboard' },
     { label: 'MicroGigs', href: '/microgigs' },
-    { label: 'Marketplace', href: '/marketplace' },
     { label: 'Explore', href: '/explore' },
     { label: 'About', href: '/about' },
   ];

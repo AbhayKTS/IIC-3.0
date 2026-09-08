@@ -1,53 +1,49 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider, RequireAuth } from "@/lib/auth";
-import Landing from "./pages/Landing";
-import Login from "./pages/Login";
-import LoginStudent from "./pages/LoginStudent";
-import LoginCollege from "./pages/LoginCollege";
-import LoginRecruiter from "./pages/LoginRecruiter";
-import SignupStudent from "./pages/SignupStudent";
-import SignupCollege from "./pages/SignupCollege";
-import SignupRecruiter from "./pages/SignupRecruiter";
-import AdminInstitutions from "./pages/AdminInstitutions";
-import NotFound from "./pages/NotFound";
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { Toaster } from '@/components/ui/toaster';
+import { Toaster as Sonner } from 'sonner';
+import { AuthProvider, useAuth } from '@/lib/auth';
+import type { UserRole } from '@/lib/types';
+
+// Public Pages
+import Landing from './pages/Landing';
+import Login from './pages/Login';
+import LoginStudent from './pages/LoginStudent';
+import LoginCollege from './pages/LoginCollege';
+import LoginRecruiter from './pages/LoginRecruiter';
+import SignupStudent from './pages/SignupStudent';
+import SignupCollege from './pages/SignupCollege';
+import SignupRecruiter from './pages/SignupRecruiter';
+import NotFound from './pages/NotFound';
+import AdminInstitutions from './pages/AdminInstitutions';
 
 // Student Pages
-import StudentDashboard from "./pages/StudentDashboard";
-import StudentProfile from "./pages/StudentProfile";
-import StudentMicroGigs from "./pages/StudentMicroGigs";
-import StudentWallet from "./pages/StudentWallet";
-import StudentLeaderboard from "./pages/StudentLeaderboard";
-import StudentEvents from "./pages/StudentEvents";
-import StudentPlacements from "./pages/StudentPlacements";
-import StudentCommunities from "./pages/StudentCommunities";
-import StudentClubs from "./pages/StudentClubs";
-import StudentChat from "./pages/StudentChat";
-import StudentMarketplace from "./pages/StudentMarketplace";
-import StudentCompetitions from "./pages/StudentCompetitions";
+import StudentDashboard from './pages/StudentDashboard';
+import StudentProfile from './pages/StudentProfile';
+import StudentMicroGigs from './pages/StudentMicroGigs';
+import StudentWallet from './pages/StudentWallet';
+import StudentLeaderboard from './pages/StudentLeaderboard';
+import StudentTransactions from './pages/StudentTransactions';
 
 // College Pages
-import CollegeDashboard from "./pages/CollegeDashboard";
-import CollegeVerification from "./pages/CollegeVerification";
-import CollegeAnalytics from "./pages/CollegeAnalytics";
-import CollegeNotices from "./pages/CollegeNotices";
-import CollegeCommunities from "./pages/CollegeCommunities";
-import CollegeEvents from "./pages/CollegeEvents";
-import CollegeRecruiters from "./pages/CollegeRecruiters";
-import CollegeClubsApprovals from "./pages/CollegeClubsApprovals";
-import CollegeMarketplaceMod from "./pages/CollegeMarketplaceMod";
+import CollegeDashboard from './pages/CollegeDashboard';
+import CollegeVerification from './pages/CollegeVerification';
+import CollegeRecruiters from './pages/CollegeRecruiters';
 
 // Recruiter Pages
-import RecruiterDashboard from "./pages/RecruiterDashboard";
-import RecruiterSearch from "./pages/RecruiterSearch";
-import RecruiterShortlist from "./pages/RecruiterShortlist";
-import RecruiterTests from "./pages/RecruiterTests";
-import RecruiterMicroGigs from "./pages/RecruiterMicroGigs";
+import RecruiterDashboard from './pages/RecruiterDashboard';
+import RecruiterMicroGigs from './pages/RecruiterMicroGigs';
 
 const queryClient = new QueryClient();
+
+function RequireAuth({ role, children }: { role: UserRole; children: React.ReactNode }) {
+  const { session, loading } = useAuth();
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" /></div>;
+  if (!session) return <Navigate to="/login" replace />;
+  if (session.role !== role) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -57,7 +53,7 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
-            {/* Public Routes (DO NOT TOUCH HOME PAGE) */}
+            {/* Public Routes */}
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/login/student" element={<LoginStudent />} />
@@ -68,219 +64,22 @@ const App = () => (
             <Route path="/signup/recruiter" element={<SignupRecruiter />} />
             <Route path="/admin/institutions" element={<AdminInstitutions />} />
 
-            {/* Student Role Routes */}
-            <Route
-              path="/student/dashboard"
-              element={
-                <RequireAuth role="student">
-                  <StudentDashboard />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/student/profile"
-              element={
-                <RequireAuth role="student">
-                  <StudentProfile />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/student/microgigs"
-              element={
-                <RequireAuth role="student">
-                  <StudentMicroGigs />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/student/wallet"
-              element={
-                <RequireAuth role="student">
-                  <StudentWallet />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/student/leaderboard"
-              element={
-                <RequireAuth role="student">
-                  <StudentLeaderboard />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/student/events"
-              element={
-                <RequireAuth role="student">
-                  <StudentEvents />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/student/placements"
-              element={
-                <RequireAuth role="student">
-                  <StudentPlacements />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/student/communities"
-              element={
-                <RequireAuth role="student">
-                  <StudentCommunities />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/student/clubs"
-              element={
-                <RequireAuth role="student">
-                  <StudentClubs />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/student/chat"
-              element={
-                <RequireAuth role="student">
-                  <StudentChat />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/student/marketplace"
-              element={
-                <RequireAuth role="student">
-                  <StudentMarketplace />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/student/competitions"
-              element={
-                <RequireAuth role="student">
-                  <StudentCompetitions />
-                </RequireAuth>
-              }
-            />
+            {/* Student Routes */}
+            <Route path="/student/dashboard" element={<RequireAuth role="student"><StudentDashboard /></RequireAuth>} />
+            <Route path="/student/profile" element={<RequireAuth role="student"><StudentProfile /></RequireAuth>} />
+            <Route path="/student/microgigs" element={<RequireAuth role="student"><StudentMicroGigs /></RequireAuth>} />
+            <Route path="/student/wallet" element={<RequireAuth role="student"><StudentWallet /></RequireAuth>} />
+            <Route path="/student/transactions" element={<RequireAuth role="student"><StudentTransactions /></RequireAuth>} />
+            <Route path="/student/leaderboard" element={<RequireAuth role="student"><StudentLeaderboard /></RequireAuth>} />
 
-            {/* College / Faculty Role Routes */}
-            <Route
-              path="/college/dashboard"
-              element={
-                <RequireAuth role="faculty">
-                  <CollegeDashboard />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/college/verification"
-              element={
-                <RequireAuth role="faculty">
-                  <CollegeVerification />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/college/analytics"
-              element={
-                <RequireAuth role="faculty">
-                  <CollegeAnalytics />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/college/notices"
-              element={
-                <RequireAuth role="faculty">
-                  <CollegeNotices />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/college/communities"
-              element={
-                <RequireAuth role="faculty">
-                  <CollegeCommunities />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/college/events"
-              element={
-                <RequireAuth role="faculty">
-                  <CollegeEvents />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/college/recruiters"
-              element={
-                <RequireAuth role="faculty">
-                  <CollegeRecruiters />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/college/clubs-approvals"
-              element={
-                <RequireAuth role="faculty">
-                  <CollegeClubsApprovals />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/college/marketplace-moderation"
-              element={
-                <RequireAuth role="faculty">
-                  <CollegeMarketplaceMod />
-                </RequireAuth>
-              }
-            />
+            {/* College Routes */}
+            <Route path="/college/dashboard" element={<RequireAuth role="faculty"><CollegeDashboard /></RequireAuth>} />
+            <Route path="/college/verification" element={<RequireAuth role="faculty"><CollegeVerification /></RequireAuth>} />
+            <Route path="/college/recruiters" element={<RequireAuth role="faculty"><CollegeRecruiters /></RequireAuth>} />
 
-            {/* Recruiter Role Routes */}
-            <Route
-              path="/recruiter/dashboard"
-              element={
-                <RequireAuth role="recruiter">
-                  <RecruiterDashboard />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/recruiter/search"
-              element={
-                <RequireAuth role="recruiter">
-                  <RecruiterSearch />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/recruiter/shortlist"
-              element={
-                <RequireAuth role="recruiter">
-                  <RecruiterShortlist />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/recruiter/tests"
-              element={
-                <RequireAuth role="recruiter">
-                  <RecruiterTests />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/recruiter/microgigs"
-              element={
-                <RequireAuth role="recruiter">
-                  <RecruiterMicroGigs />
-                </RequireAuth>
-              }
-            />
+            {/* Recruiter Routes */}
+            <Route path="/recruiter/dashboard" element={<RequireAuth role="recruiter"><RecruiterDashboard /></RequireAuth>} />
+            <Route path="/recruiter/microgigs" element={<RequireAuth role="recruiter"><RecruiterMicroGigs /></RequireAuth>} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>

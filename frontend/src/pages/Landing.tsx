@@ -390,8 +390,7 @@ export default function Landing() {
           >
             <FeatureCard className="md:col-span-7" icon={WalletCards} eyebrow="Verified identity · SBT wallet" title="Your achievements, permanently yours." copy="College ID and facial verification create a bot-free identity. Credentials, work and recognition then collect in a non-transferable wallet that recruiters can trust." identity tags={['College verified', 'Face matched', 'SBT issued']} />
             <FeatureCard className="md:col-span-5" icon={BriefcaseBusiness} eyebrow="MicroGigs" title="Small tasks. Real earnings." copy="Complete short projects for verified campus teams and recruiters, earn money, and add proof of work to your record." tags={['Remote work', 'Paid tasks', 'Verified only']} />
-            <FeatureCard className="md:col-span-5" icon={ShoppingBag} eyebrow="Campus marketplace" title="Trade inside a trusted circle." copy="Buy and sell books, devices, services and essentials with verified people from your own college community." tags={['Campus-only', 'Secure trade']} />
-            <FeatureCard className="md:col-span-7" icon={Trophy} eyebrow="Live leaderboards" title="Recognition built on contribution." copy="Discover rising students and high-performing colleges through transparent rankings shaped by verified work and community impact." tags={['Merit-based', 'Transparent', 'Real-time']} />
+            <FeatureCard className="md:col-span-12" icon={Trophy} eyebrow="Live leaderboards" title="Recognition built on contribution." copy="Discover rising students and high-performing colleges through transparent rankings shaped by verified work and community impact." tags={['Merit-based', 'Transparent', 'Real-time']} />
           </motion.div>
         </motion.div>
       </section>

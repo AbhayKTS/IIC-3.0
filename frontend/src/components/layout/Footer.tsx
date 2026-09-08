@@ -17,7 +17,7 @@ export default function Footer() {
           <div>
             <h4 className="font-semibold text-xs mb-4 uppercase tracking-widest text-foreground">Platform</h4>
             <div className="space-y-3">
-              {[['Colleges', '/colleges'], ['Leaderboard', '/leaderboard'], ['MicroGigs', '/microgigs'], ['Marketplace', '/marketplace']].map(([l, h]) => (
+              {[['Colleges', '/colleges'], ['Leaderboard', '/leaderboard'], ['MicroGigs', '/microgigs']].map(([l, h]) => (
                 <Link key={h} to={h} className="block text-sm text-muted-foreground hover:text-primary transition-colors">{l}</Link>
               ))}
             </div>
