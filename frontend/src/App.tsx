@@ -25,6 +25,7 @@ import StudentMicroGigs from './pages/StudentMicroGigs';
 import StudentWallet from './pages/StudentWallet';
 import StudentLeaderboard from './pages/StudentLeaderboard';
 import StudentTransactions from './pages/StudentTransactions';
+import StudentPlacements from './pages/StudentPlacements';
 
 // College Pages
 import CollegeDashboard from './pages/CollegeDashboard';
@@ -72,6 +73,7 @@ const App = () => (
             <Route path="/student/microgigs" element={<RequireAuth role="student"><StudentMicroGigs /></RequireAuth>} />
             <Route path="/student/wallet" element={<RequireAuth role="student"><StudentWallet /></RequireAuth>} />
             <Route path="/student/transactions" element={<RequireAuth role="student"><StudentTransactions /></RequireAuth>} />
+            <Route path="/student/placements" element={<RequireAuth role="student"><StudentPlacements /></RequireAuth>} />
             <Route path="/student/leaderboard" element={<RequireAuth role="student"><StudentLeaderboard /></RequireAuth>} />
 
             {/* College Routes */}

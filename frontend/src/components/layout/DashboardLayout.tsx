@@ -15,6 +15,7 @@ const studentNav: NavItem[] = [
   { label: 'Leaderboard', href: '/student/leaderboard', icon: <Trophy className="h-4 w-4" /> },
   { label: 'Wallet & SBTs', href: '/student/wallet', icon: <Wallet className="h-4 w-4" /> },
   { label: 'Transactions', href: '/student/transactions', icon: <Layers className="h-4 w-4" /> },
+  { label: 'Placements', href: '/student/placements', icon: <Briefcase className="h-4 w-4" /> },
   { label: 'MicroGigs', href: '/student/microgigs', icon: <Zap className="h-4 w-4" /> },
 ];
 
