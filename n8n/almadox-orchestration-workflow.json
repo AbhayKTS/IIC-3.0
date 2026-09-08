@@ -1,0 +1,198 @@
+{
+  "name": "AlmaDox - Student Verification & Micro-Gig Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "almadox-events",
+        "options": {}
+      },
+      "name": "Webhook: AlmaDox Event Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "almadox-events-webhook"
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{$json.body.event}}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "student_verified",
+              "output": 0
+            },
+            {
+              "value2": "resume_parsed",
+              "output": 1
+            },
+            {
+              "value2": "job_match",
+              "output": 2
+            }
+          ]
+        }
+      },
+      "name": "Switch: Event Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "alertTitle",
+              "value": "🎓 New Verified Student Onboarded!"
+            },
+            {
+              "name": "alertMessage",
+              "value": "=Student {{$node[\"Webhook: AlmaDox Event Trigger\"].json.body.data.name || \"Candidate\"}} has successfully verified their University ID via Azure OCR and minted their initial Soulbound Token (SBT) on Polygon."
+            },
+            {
+              "name": "recipientEmail",
+              "value": "={{$node[\"Webhook: AlmaDox Event Trigger\"].json.body.data.email || \"placement@university.ac.in\"}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Format: Student Verified Alert",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [720, 180]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "alertTitle",
+              "value": "⚡ AI Resume Skills Extracted"
+            },
+            {
+              "name": "alertMessage",
+              "value": "=Skills indexed for candidate: {{$node[\"Webhook: AlmaDox Event Trigger\"].json.body.data.extractedSkills ? $node[\"Webhook: AlmaDox Event Trigger\"].json.body.data.extractedSkills.join(', ') : \"Technical Skills\"}}. Candidate Skill Graph updated."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Format: Resume Skills Alert",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [720, 320]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://iic-3-0-ansh.vercel.app/api/v1/internal/notifications",
+        "options": {},
+        "headers": {
+          "x-n8n-internal-key": "almadox-secret-key-2026",
+          "Content-Type": "application/json"
+        },
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "studentId",
+              "value": "={{$node[\"Webhook: AlmaDox Event Trigger\"].json.body.data.studentId || \"student\"}}"
+            },
+            {
+              "name": "title",
+              "value": "={{$json.alertTitle}}"
+            },
+            {
+              "name": "message",
+              "value": "={{$json.alertMessage}}"
+            }
+          ]
+        }
+      },
+      "name": "Push In-App Notification (Backend Callback)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [960, 240]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"success\",\n  \"event\": \"{{$node[\"Webhook: AlmaDox Event Trigger\"].json.body.event}}\",\n  \"automatedBy\": \"n8n-orchestrator\",\n  \"timestamp\": \"{{new Date().toISOString()}}\"\n}",
+        "options": {}
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1180, 240]
+    }
+  ],
+  "connections": {
+    "Webhook: AlmaDox Event Trigger": {
+      "main": [
+        [
+          {
+            "node": "Switch: Event Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch: Event Router": {
+      "main": [
+        [
+          {
+            "node": "Format: Student Verified Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format: Resume Skills Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format: Student Verified Alert": {
+      "main": [
+        [
+          {
+            "node": "Push In-App Notification (Backend Callback)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format: Resume Skills Alert": {
+      "main": [
+        [
+          {
+            "node": "Push In-App Notification (Backend Callback)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Push In-App Notification (Backend Callback)": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {},
+  "versionId": "almadox-v1"
+}
