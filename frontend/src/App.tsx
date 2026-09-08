@@ -12,6 +12,9 @@ import LoginRecruiter from "./pages/LoginRecruiter";
 import SignupStudent from "./pages/SignupStudent";
 import SignupCollege from "./pages/SignupCollege";
 import SignupRecruiter from "./pages/SignupRecruiter";
+import AdminInstitutions from "./pages/AdminInstitutions";
+import CollegeVerification from "./pages/CollegeVerification";
+import StudentProfile from "./pages/StudentProfile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +35,9 @@ const App = () => (
             <Route path="/signup/student" element={<SignupStudent />} />
             <Route path="/signup/college" element={<SignupCollege />} />
             <Route path="/signup/recruiter" element={<SignupRecruiter />} />
+            <Route path="/admin/institutions" element={<AdminInstitutions />} />
+            <Route path="/college/verification" element={<CollegeVerification />} />
+            <Route path="/student/profile" element={<StudentProfile />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

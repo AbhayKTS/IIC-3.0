@@ -18,6 +18,7 @@ const initFirebaseAdmin = () => {
 
   const isCloudRun = !!process.env.K_SERVICE;
   const isRender = !!process.env.RENDER;
+  const isVercel = !!process.env.VERCEL;
 
   // Support GOOGLE_APPLICATION_CREDENTIALS_JSON env var (Render, etc.)
   if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON && !hasInlineCreds) {
@@ -42,7 +43,7 @@ const initFirebaseAdmin = () => {
     config.firebase.serviceAccountPath = '';
   }
 
-  if (!hasInlineCredsUpdated && !hasInlineCreds && !config.firebase.serviceAccountPath && !isTestEmulator && !isCloudRun && !isRender) {
+  if (!hasInlineCredsUpdated && !hasInlineCreds && !config.firebase.serviceAccountPath && !isTestEmulator && !isCloudRun && !isRender && !isVercel) {
     throw new Error('Firebase admin credentials are missing');
   }
 

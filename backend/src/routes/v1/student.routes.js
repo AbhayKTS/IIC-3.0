@@ -5,6 +5,8 @@ const {
   getStudentProfile,
   createStudentProfile,
   updateStudentProfile,
+  verifyIdCard,
+  parseResume,
 } = require('../../controllers/student.controller');
 const { registerForEvent, cancelEventRegistration } = require('../../controllers/events.controller');
 const {
@@ -26,9 +28,28 @@ const { verifyFirebaseToken } = require('../../middleware/verifyFirebaseToken');
 const { attachUserProfile } = require('../../middleware/attachUserProfile');
 const { requireRole } = require('../../middleware/requireRole');
 const { requireVerifiedStudent } = require('../../middleware/requireVerifiedStudent');
+const upload = require('../../middleware/upload');
 const { Roles } = require('../../utils/roles');
 
 const router = express.Router();
+
+router.post(
+  '/verify-id-card',
+  verifyFirebaseToken,
+  attachUserProfile,
+  requireRole([Roles.STUDENT]),
+  upload.single('idCard'),
+  verifyIdCard
+);
+
+router.post(
+  '/parse-resume',
+  verifyFirebaseToken,
+  attachUserProfile,
+  requireRole([Roles.STUDENT]),
+  upload.uploadResume.single('resume'),
+  parseResume
+);
 
 router.get(
   '/me',

@@ -3,7 +3,7 @@ const dotenv = require('dotenv');
 
 const inferEnv = () => {
   if (process.env.NODE_ENV) return process.env.NODE_ENV;
-  if (process.env.RENDER || process.env.RENDER_EXTERNAL_URL || process.env.K_SERVICE) return 'production';
+  if (process.env.RENDER || process.env.RENDER_EXTERNAL_URL || process.env.K_SERVICE || process.env.VERCEL) return 'production';
   return 'development';
 };
 
@@ -22,9 +22,13 @@ const buildCorsOriginMatcher = ({ origins, allowNetlifyPreviews }) => {
   return (origin, callback) => {
     if (!origin) return callback(null, true);
 
-    if (origins.includes(origin)) return callback(null, true);
+    if (origins.includes('*') || origins.includes(origin)) return callback(null, true);
 
     if (allowNetlifyPreviews && /^https:\/\/[a-z0-9-]+\.netlify\.app$/i.test(origin)) {
+      return callback(null, true);
+    }
+
+    if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin) || /^https:\/\/[a-z0-9-]+\.web\.app$/i.test(origin) || /^https:\/\/[a-z0-9-]+\.firebaseapp\.com$/i.test(origin)) {
       return callback(null, true);
     }
 

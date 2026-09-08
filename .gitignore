@@ -5,6 +5,9 @@ logs/
 .env.*
 !.env.example
 !frontend/.env.production
+!backend/.env.example
+.firebase/
+frontend/dist/
 *.log
 service-account*.json
 *-firebase-adminsdk-*.json

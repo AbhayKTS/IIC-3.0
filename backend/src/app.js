@@ -41,9 +41,16 @@ app.use(limiter);
 app.use(express.json({ limit: config.server.bodyLimit }));
 app.use(express.urlencoded({ extended: true, limit: config.server.bodyLimit }));
 
-const openApiPath = path.resolve(process.cwd(), 'docs', 'openapi.yaml');
-const openApiSpec = yaml.load(openApiPath);
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
+const fs = require('fs');
+try {
+  const openApiPath = path.resolve(__dirname, '..', 'docs', 'openapi.yaml');
+  if (fs.existsSync(openApiPath)) {
+    const openApiSpec = yaml.load(openApiPath);
+    app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
+  }
+} catch (_) {
+  // Swagger docs load is optional in serverless
+}
 
 app.use(requestMetrics);
 

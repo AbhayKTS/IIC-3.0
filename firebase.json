@@ -18,7 +18,7 @@
     ]
   },
   "firestore": {
-    "rules": "firestore.rules.prod"
+    "rules": "backend/firestore.rules.prod"
   },
   "emulators": {
     "firestore": { "port": 8181 },

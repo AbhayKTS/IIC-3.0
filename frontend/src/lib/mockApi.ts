@@ -1,7 +1,7 @@
 import type {
-  College, Student, Faculty, Recruiter, Gig, GigApplication,
+  College, Institution, Student, Faculty, Recruiter, Gig, GigApplication,
   MarketplaceItem, WalletSBT, Community, Club, Event, Team,
-  Placement, Notice, ChatMessage, Competition, ShortlistEntry, Session
+  Placement, Notice, ChatMessage, Competition, ShortlistEntry, Session, IdVerificationData, ResumeExtractionData
 } from './types';
 import { auth } from './firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
@@ -77,11 +77,79 @@ export const api = {
   async getPendingStudents(collegeId: string): Promise<Student[]> {
     return request(`/compat/students/pending?collegeId=${encodeURIComponent(collegeId)}`);
   },
+  async getFacultyPendingStudents(): Promise<{ students: any[] }> {
+    return request('/faculty/pending-students', { auth: true });
+  },
+  async facultyVerifyStudent(studentId: string, status: 'verified' | 'rejected') {
+    return request('/faculty/verify-student', {
+      method: 'POST',
+      body: { studentId, status },
+      auth: true,
+    });
+  },
   async approveStudent(studentId: string, collegeId: string): Promise<Student> {
     return request(`/compat/students/${studentId}/approve`, { method: 'POST', body: { collegeId } });
   },
   async rejectStudent(studentId: string): Promise<Student> {
     return request(`/compat/students/${studentId}/reject`, { method: 'POST' });
+  },
+  async uploadIdCard(file: File): Promise<{ idVerification: IdVerificationData; message?: string }> {
+    const formData = new FormData();
+    formData.append('idCard', file);
+
+    const token = await auth.currentUser?.getIdToken();
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const res = await fetch(`${API_BASE}/student/verify-id-card`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    const payload = await res.json().catch(() => null);
+    if (!res.ok) {
+      const message = payload?.error?.message || res.statusText || 'ID card upload failed';
+      throw new Error(message);
+    }
+    return payload?.data;
+  },
+
+  async uploadResume(file: File): Promise<{
+    resumeData: ResumeExtractionData;
+    mergedSkills: string[];
+    newSkillsAdded: string[];
+    message?: string;
+  }> {
+    const formData = new FormData();
+    formData.append('resume', file);
+
+    const token = await auth.currentUser?.getIdToken();
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const res = await fetch(`${API_BASE}/student/parse-resume`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    const payload = await res.json().catch(() => null);
+    if (!res.ok) {
+      const message = payload?.error?.message || res.statusText || 'Resume parsing failed';
+      throw new Error(message);
+    }
+    return payload?.data;
+  },
+
+  async updateStudentSkills(skills: string[]): Promise<Student> {
+    const session = JSON.parse(localStorage.getItem('cv_session') || '{}');
+    const studentId = session.userId;
+    return request(`/compat/students/${studentId}`, {
+      method: 'PUT',
+      body: { skills },
+      auth: true,
+    });
   },
 
   // Wallet
@@ -317,6 +385,27 @@ export const api = {
 
   async getAiStatus() {
     return request('/api/v1/ai/status');
+  },
+
+  // --- SuperAdmin ---
+  async superAdminGetInstitutions(): Promise<Institution[]> {
+    return request('/superadmin/institutions', { auth: true });
+  },
+
+  async superAdminCreateInstitution(data: { name: string; domain: string; contactEmail?: string }): Promise<Institution> {
+    return request('/superadmin/institutions', { method: 'POST', body: data, auth: true });
+  },
+
+  async superAdminUpdateInstitution(id: string, data: { name?: string; isActive?: boolean; contactEmail?: string }): Promise<Institution> {
+    return request(`/superadmin/institutions/${id}`, { method: 'PATCH', body: data, auth: true });
+  },
+
+  async superAdminDeleteInstitution(id: string): Promise<{ id: string; isActive: boolean; deleted: boolean }> {
+    return request(`/superadmin/institutions/${id}`, { method: 'DELETE', auth: true });
+  },
+
+  async superAdminPromoteAdminFaculty(data: { collegeId: string; uid?: string; email?: string }) {
+    return request('/superadmin/promote-admin', { method: 'POST', body: data, auth: true });
   },
 
   resetAll() {

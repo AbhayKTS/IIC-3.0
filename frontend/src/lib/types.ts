@@ -7,6 +7,55 @@ export interface College {
   description: string; established: number;
 }
 
+export interface Institution {
+  id: string;
+  collegeId?: string;
+  name: string;
+  domain: string;
+  contactEmail?: string;
+  isActive: boolean;
+  studentCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface IdVerificationData {
+  status: 'pending_review' | 'verified' | 'rejected';
+  extractedData?: {
+    studentName?: string | null;
+    rollNumber?: string | null;
+    collegeName?: string | null;
+    validUntil?: string | null;
+    rawFields?: Record<string, any>;
+  };
+  confidence?: number;
+  collegeMatch?: {
+    matched: boolean;
+    extractedCollegeName?: string | null;
+    expectedCollegeName?: string | null;
+    mismatchFlagged?: boolean;
+  };
+  source?: string;
+  submittedAt?: string;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+}
+
+export interface ExtractedSkill {
+  name: string;
+  category?: 'technical' | 'soft';
+}
+
+export interface ResumeExtractionData {
+  skills: ExtractedSkill[];
+  education?: Array<{ degree?: string; institution?: string; year?: string }>;
+  experience?: Array<{ title?: string; org?: string; duration?: string; description?: string }>;
+  certifications?: string[];
+  links?: { github?: string | null; linkedin?: string | null; portfolio?: string | null };
+  method: 'azure-openai' | 'rule-based';
+  extractedAt?: string;
+}
+
 export interface Student {
   id: string; name: string; email: string; password: string;
   collegeId: string; verificationStatus: VerificationStatus;
@@ -17,6 +66,8 @@ export interface Student {
   achievements: { title: string; date: string; points: number }[];
   certificates: { title: string; issuer: string; date: string }[];
   bio?: string;
+  idVerification?: IdVerificationData;
+  resumeExtraction?: ResumeExtractionData;
 }
 
 export interface Faculty {

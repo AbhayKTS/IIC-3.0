@@ -12,6 +12,7 @@ const userRoutes = require('./v1/user.routes');
 const compatRoutes = require('./v1/compat.routes');
 const aiRoutes = require('./v1/ai.routes');
 const sbtRoutes = require('./v1/sbt.routes');
+const superadminRoutes = require('./v1/superadmin.routes');
 const { ok } = require('../utils/response');
 
 const router = express.Router();
@@ -34,5 +35,6 @@ router.use('/user', userRoutes);
 router.use('/compat', compatRoutes);
 router.use('/ai', aiRoutes);
 router.use('/sbt', sbtRoutes);
+router.use('/superadmin', superadminRoutes);
 
 module.exports = router;
