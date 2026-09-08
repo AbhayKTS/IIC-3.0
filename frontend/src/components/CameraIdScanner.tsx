@@ -107,6 +107,7 @@ export default function CameraIdScanner({
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
   const [flashActive, setFlashActive] = useState<boolean>(false);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [orientation, setOrientation] = useState<'vertical' | 'horizontal'>('vertical');
 
   // ── Camera management ──────────────────────────────────────────────────────
   const stopCamera = useCallback(() => {
@@ -278,17 +279,47 @@ export default function CameraIdScanner({
 
       {/* ── CAMERA INIT + LIVE PREVIEW ──────────────────────────────────────── */}
       {(phase === 'camera_init' || phase === 'live') && (
-        <div className="w-full flex flex-col items-center gap-4">
-          <p className="text-xs text-muted-foreground text-center">
-            Position your <span className="text-foreground font-semibold">physical college ID card</span> inside the frame
-          </p>
+        <div className="w-full flex flex-col items-center gap-3">
+          {/* Orientation toggle */}
+          <div className="flex items-center justify-between w-full max-w-sm px-1">
+            <p className="text-xs text-muted-foreground">
+              Align <span className="text-foreground font-semibold">vertical college ID card</span>
+            </p>
+            <div className="flex items-center gap-1 bg-secondary/60 p-0.5 rounded-lg text-[11px]">
+              <button
+                type="button"
+                onClick={() => setOrientation('vertical')}
+                className={`px-2 py-0.5 rounded-md font-medium transition-all ${
+                  orientation === 'vertical'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                ↕ Vertical
+              </button>
+              <button
+                type="button"
+                onClick={() => setOrientation('horizontal')}
+                className={`px-2 py-0.5 rounded-md font-medium transition-all ${
+                  orientation === 'horizontal'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                ↔ Horizontal
+              </button>
+            </div>
+          </div>
 
           {/* Camera viewport */}
           <div className="relative w-full max-w-sm rounded-2xl overflow-hidden bg-black border border-border shadow-2xl">
             <video
               ref={videoRef}
               className="w-full object-cover"
-              style={{ minHeight: 230, maxHeight: 300 }}
+              style={{
+                minHeight: orientation === 'vertical' ? 340 : 230,
+                maxHeight: orientation === 'vertical' ? 410 : 290,
+              }}
               autoPlay
               muted
               playsInline
@@ -309,22 +340,42 @@ export default function CameraIdScanner({
             )}
 
             {/* Scanning frame overlay */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="relative w-56 h-36 border border-primary/30 rounded-xl bg-primary/5">
-                <span className="absolute -top-1 -left-1 w-6 h-6 border-t-3 border-l-3 border-primary rounded-tl-lg" />
-                <span className="absolute -top-1 -right-1 w-6 h-6 border-t-3 border-r-3 border-primary rounded-tr-lg" />
-                <span className="absolute -bottom-1 -left-1 w-6 h-6 border-b-3 border-l-3 border-primary rounded-bl-lg" />
-                <span className="absolute -bottom-1 -right-1 w-6 h-6 border-b-3 border-r-3 border-primary rounded-br-lg" />
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-4">
+              {orientation === 'vertical' ? (
+                <div className="relative w-48 h-72 border border-primary/40 rounded-2xl bg-primary/5 shadow-inner">
+                  {/* Lanyard slot indicator at the top */}
+                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-8 h-2 rounded-full border border-primary/50 bg-background/80" />
+                  <span className="absolute -top-1 -left-1 w-6 h-6 border-t-3 border-l-3 border-primary rounded-tl-lg" />
+                  <span className="absolute -top-1 -right-1 w-6 h-6 border-t-3 border-r-3 border-primary rounded-tr-lg" />
+                  <span className="absolute -bottom-1 -left-1 w-6 h-6 border-b-3 border-l-3 border-primary rounded-bl-lg" />
+                  <span className="absolute -bottom-1 -right-1 w-6 h-6 border-b-3 border-r-3 border-primary rounded-br-lg" />
 
-                {phase === 'live' && (
-                  <div className="absolute inset-x-0 top-0 h-0.5 bg-primary/80 animate-scan-line" />
-                )}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-[10px] text-primary/70 tracking-widest uppercase font-semibold bg-background/60 px-2 py-0.5 rounded backdrop-blur-sm">
-                    FIT ID CARD HERE
-                  </span>
+                  {phase === 'live' && (
+                    <div className="absolute inset-x-0 top-0 h-0.5 bg-primary/90 animate-scan-line shadow-[0_0_10px_#38bdf8]" />
+                  )}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-[10px] text-primary/80 tracking-widest uppercase font-semibold bg-background/70 px-2 py-0.5 rounded backdrop-blur-sm">
+                      FIT VERTICAL ID HERE
+                    </span>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="relative w-60 h-38 border border-primary/40 rounded-xl bg-primary/5 shadow-inner">
+                  <span className="absolute -top-1 -left-1 w-6 h-6 border-t-3 border-l-3 border-primary rounded-tl-lg" />
+                  <span className="absolute -top-1 -right-1 w-6 h-6 border-t-3 border-r-3 border-primary rounded-tr-lg" />
+                  <span className="absolute -bottom-1 -left-1 w-6 h-6 border-b-3 border-l-3 border-primary rounded-bl-lg" />
+                  <span className="absolute -bottom-1 -right-1 w-6 h-6 border-b-3 border-r-3 border-primary rounded-br-lg" />
+
+                  {phase === 'live' && (
+                    <div className="absolute inset-x-0 top-0 h-0.5 bg-primary/90 animate-scan-line shadow-[0_0_10px_#38bdf8]" />
+                  )}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-[10px] text-primary/80 tracking-widest uppercase font-semibold bg-background/70 px-2 py-0.5 rounded backdrop-blur-sm">
+                      FIT HORIZONTAL ID HERE
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {phase === 'camera_init' && (
@@ -386,10 +437,13 @@ export default function CameraIdScanner({
               src={capturedImageUrl}
               alt="Captured College ID"
               className="w-full object-cover"
-              style={{ minHeight: 210, maxHeight: 290 }}
+              style={{
+                minHeight: orientation === 'vertical' ? 320 : 210,
+                maxHeight: orientation === 'vertical' ? 400 : 290,
+              }}
             />
             <div className="absolute bottom-2 left-2 right-2 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-border/60 text-[11px] text-muted-foreground flex items-center justify-between">
-              <span>Photo ready for AI OCR</span>
+              <span>{orientation === 'vertical' ? 'Vertical ID Photo' : 'ID Photo'} ready for AI OCR</span>
               <span className="text-primary font-semibold">High Quality</span>
             </div>
           </div>
@@ -446,7 +500,10 @@ export default function CameraIdScanner({
                 src={capturedImageUrl}
                 alt="Captured ID scan in progress"
                 className="w-full object-cover opacity-80"
-                style={{ minHeight: 210, maxHeight: 270 }}
+                style={{
+                  minHeight: orientation === 'vertical' ? 320 : 210,
+                  maxHeight: orientation === 'vertical' ? 390 : 270,
+                }}
               />
             )}
             <div className="absolute inset-0 bg-primary/10 pointer-events-none" />
