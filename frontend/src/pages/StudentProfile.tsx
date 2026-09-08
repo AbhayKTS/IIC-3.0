@@ -143,12 +143,21 @@ export default function StudentProfile() {
           if (coding.codingProfiles.codeforces?.handle) {
             setCodeforcesHandle(coding.codingProfiles.codeforces.handle);
           }
+          if (coding.codingProfiles.github?.username) {
+            setGithubHandle(coding.codingProfiles.github.username);
+          }
         }
       }
     } catch {
       // Fallback: session student
       if (session?.user) {
         setProfile(session.user as Student);
+        const u = session.user as any;
+        if (u.name) setStudentName(u.name);
+        if (u.bio) setStudentBio(u.bio);
+        if (u.github) setGithubHandle(u.github);
+        if (u.leetcode) setLeetcodeHandle(u.leetcode);
+        if (u.codeforces) setCodeforcesHandle(u.codeforces);
       }
     } finally {
       setLoading(false);

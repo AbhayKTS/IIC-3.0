@@ -17,9 +17,12 @@
       }
     ]
   },
-  "firestore": {
-    "rules": "backend/firestore.rules.prod"
-  },
+  "firestore": [
+    {
+      "database": "almadox-for-the-students",
+      "rules": "backend/firestore.rules.prod"
+    }
+  ],
   "emulators": {
     "firestore": { "port": 8181 },
     "auth": { "port": 9099 },

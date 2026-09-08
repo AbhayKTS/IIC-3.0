@@ -19,8 +19,9 @@ export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfi
 // Initialize Firebase Auth
 export const auth = getAuth(app);
 
-// Initialize Firestore
-export const db = getFirestore(app);
+// Initialize Firestore with named database
+export const FIRESTORE_DATABASE_ID = import.meta.env.VITE_FIREBASE_DATABASE_ID || "almadox-for-the-students";
+export const db = getFirestore(app, FIRESTORE_DATABASE_ID);
 
 // Initialize Analytics safely (only supported in browser environments)
 export let analytics: ReturnType<typeof getAnalytics> | null = null;

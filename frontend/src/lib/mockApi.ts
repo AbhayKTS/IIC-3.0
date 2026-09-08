@@ -295,23 +295,58 @@ export const api = {
     return request('/compat/students');
   },
   async getStudentById(id: string): Promise<Student | undefined> {
-    return request(`/compat/students/${id}`);
+    try {
+      const res = await request<Student>(`/compat/students/${id}`);
+      if (res && res.id) return res;
+    } catch (_) {}
+
+    // Fallback: direct Firestore read
+    if (db && id) {
+      try {
+        const uSnap = await getDoc(doc(db, 'users', id));
+        if (uSnap.exists()) {
+          return { id, ...uSnap.data() } as Student;
+        }
+        const sSnap = await getDoc(doc(db, 'students', id));
+        if (sSnap.exists()) {
+          return { id, ...sSnap.data() } as Student;
+        }
+      } catch (e) {
+        console.warn('Direct Firestore student read error:', e);
+      }
+    }
+
+    // Fallback: active session cache
+    const session = JSON.parse(localStorage.getItem('cv_session') || '{}');
+    if (session?.userId === id && session?.user) {
+      return session.user as Student;
+    }
+    return undefined;
   },
   async updateStudent(id: string, data: Partial<Student>): Promise<Student> {
+    const session = JSON.parse(localStorage.getItem('cv_session') || '{}');
+    if (session?.userId === id && session?.user) {
+      session.user = { ...session.user, ...data };
+      localStorage.setItem('cv_session', JSON.stringify(session));
+    }
+
     try {
       if (db && id) {
         await setDoc(doc(db, 'users', id), data, { merge: true }).catch(() => null);
         await setDoc(doc(db, 'students', id), data, { merge: true }).catch(() => null);
+        await setDoc(doc(db, 'studentProfiles', id), data, { merge: true }).catch(() => null);
       }
     } catch (e) {
       console.warn('Direct Firestore student write warning:', e);
     }
+
     broadcastRealtimeUpdate({
       type: 'student:updated',
       entityType: 'student',
       entityId: id,
       data,
     });
+
     return request(`/compat/students/${id}`, { method: 'PUT', body: data }).catch(() => data as Student);
   },
   async getVerifiedStudents(): Promise<Student[]> {
@@ -340,29 +375,120 @@ export const api = {
 
   // Coding Profiles
   async getCodingProfiles(): Promise<{ codingProfiles: CodingProfiles }> {
-    return request('/student/coding-profiles', { auth: true });
+    try {
+      return await request('/student/coding-profiles', { auth: true });
+    } catch (apiErr) {
+      // Fallback: direct Firestore query
+      const session = JSON.parse(localStorage.getItem('cv_session') || '{}');
+      const studentId = session?.userId;
+      if (studentId && db) {
+        try {
+          const snap = await getDoc(doc(db, 'users', studentId));
+          if (snap.exists()) {
+            const uData = snap.data();
+            if (uData?.codingProfiles) {
+              return { codingProfiles: uData.codingProfiles };
+            }
+            if (uData?.leetcode || uData?.codeforces || uData?.github) {
+              return {
+                codingProfiles: {
+                  leetcode: uData.leetcode ? ({ username: uData.leetcode, status: 'connected' } as any) : null,
+                  codeforces: uData.codeforces ? ({ handle: uData.codeforces, status: 'connected' } as any) : null,
+                  github: uData.github ? ({ username: uData.github, status: 'connected' } as any) : null,
+                },
+              };
+            }
+          }
+        } catch (_) {}
+      }
+      throw apiErr;
+    }
   },
   async updateCodingProfiles(data: { leetcodeUsername?: string; codeforcesHandle?: string; githubUsername?: string }): Promise<{ codingProfiles: CodingProfiles }> {
-    const res = await request('/student/coding-profiles', {
-      method: 'PUT',
-      body: data,
-      auth: true,
-    });
+    let res: { codingProfiles: CodingProfiles } | null = null;
+    try {
+      res = await request('/student/coding-profiles', {
+        method: 'PUT',
+        body: data,
+        auth: true,
+      });
+    } catch (apiErr) {
+      console.warn('Backend /student/coding-profiles call failed, persisting directly to Firestore and local state:', apiErr);
+    }
+
     const session = JSON.parse(localStorage.getItem('cv_session') || '{}');
     const studentId = session?.userId;
+
+    // Build fallback coding profiles structure if backend was offline
+    const finalCodingProfiles: CodingProfiles = res?.codingProfiles || {
+      leetcode: data.leetcodeUsername ? ({
+        username: data.leetcodeUsername,
+        profileUrl: `https://leetcode.com/u/${data.leetcodeUsername}/`,
+        totalSolved: 0,
+        easySolved: 0,
+        mediumSolved: 0,
+        hardSolved: 0,
+        ranking: null,
+        contributionPoints: 0,
+        reputation: 0,
+        status: 'connected',
+        error: null,
+      } as any) : null,
+      codeforces: data.codeforcesHandle ? ({
+        handle: data.codeforcesHandle,
+        profileUrl: `https://codeforces.com/profile/${data.codeforcesHandle}`,
+        rating: 0,
+        maxRating: 0,
+        rank: 'unranked',
+        maxRank: 'unranked',
+        totalSolved: 0,
+        contestsCount: 0,
+        status: 'connected',
+        error: null,
+      } as any) : null,
+      github: data.githubUsername ? ({
+        username: data.githubUsername,
+        profileUrl: `https://github.com/${data.githubUsername}`,
+        publicRepos: 0,
+        followers: 0,
+        points: 0,
+        status: 'connected',
+        error: null,
+      } as any) : null,
+    };
+
     if (studentId) {
+      // 1. Update session storage so UI reflects changes immediately
+      if (session.user) {
+        if (data.leetcodeUsername !== undefined) session.user.leetcode = data.leetcodeUsername || '';
+        if (data.codeforcesHandle !== undefined) session.user.codeforces = data.codeforcesHandle || '';
+        if (data.githubUsername !== undefined) session.user.github = data.githubUsername || '';
+        session.user.codingProfiles = finalCodingProfiles;
+        localStorage.setItem('cv_session', JSON.stringify(session));
+      }
+
+      // 2. Direct Firestore writes to users, students, and studentProfiles
       try {
         if (db) {
-          const profileData: any = {};
-          if (data.leetcodeUsername) profileData.leetcode = data.leetcodeUsername;
-          if (data.codeforcesHandle) profileData.codeforces = data.codeforcesHandle;
-          if (data.githubUsername) profileData.github = data.githubUsername;
-          await setDoc(doc(db, 'users', studentId), profileData, { merge: true }).catch(() => null);
-          await setDoc(doc(db, 'students', studentId), profileData, { merge: true }).catch(() => null);
+          const profileData: any = {
+            codingProfiles: finalCodingProfiles,
+            updatedAt: new Date().toISOString(),
+          };
+          if (data.leetcodeUsername !== undefined) profileData.leetcode = data.leetcodeUsername || '';
+          if (data.codeforcesHandle !== undefined) profileData.codeforces = data.codeforcesHandle || '';
+          if (data.githubUsername !== undefined) profileData.github = data.githubUsername || '';
+
+          await Promise.allSettled([
+            setDoc(doc(db, 'users', studentId), profileData, { merge: true }),
+            setDoc(doc(db, 'students', studentId), profileData, { merge: true }),
+            setDoc(doc(db, 'studentProfiles', studentId), profileData, { merge: true }),
+          ]);
         }
       } catch (e) {
         console.warn('Direct Firestore coding profile update warning:', e);
       }
+
+      // 3. Broadcast real-time message
       broadcastRealtimeUpdate({
         type: 'student:updated',
         entityType: 'student',
@@ -371,10 +497,12 @@ export const api = {
           leetcode: data.leetcodeUsername,
           codeforces: data.codeforcesHandle,
           github: data.githubUsername,
+          codingProfiles: finalCodingProfiles,
         },
       });
     }
-    return res;
+
+    return { codingProfiles: finalCodingProfiles };
   },
   async refreshCodingProfiles(): Promise<{ codingProfiles: CodingProfiles }> {
     return request('/student/coding-profiles/refresh', {

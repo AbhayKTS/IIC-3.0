@@ -1,8 +1,46 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Users & profiles (students, recruiters, college admins, demo users)
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+    match /students/{studentId} {
+      allow read, write: if true;
+    }
+    match /studentProfiles/{studentId} {
+      allow read, write: if true;
+    }
+    match /studentLeaderboard/{studentId} {
+      allow read, write: if true;
+    }
+
+    // College & recruiter profiles
+    match /colleges/{collegeId} {
+      allow read, write: if true;
+    }
+    match /recruiters/{recruiterId} {
+      allow read, write: if true;
+    }
+
+    // Core operational collections
+    match /jobs/{jobId} {
+      allow read, write: if true;
+    }
+    match /applications/{appId} {
+      allow read, write: if true;
+    }
+    match /placements/{placementId} {
+      allow read, write: if true;
+    }
+    match /verifications/{verId} {
+      allow read, write: if true;
+    }
+
+    // Global match fallback for real-time collaboration
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
   }
 }
+
