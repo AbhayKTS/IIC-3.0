@@ -318,23 +318,69 @@ const makeVerificationDecision = ({
   const matchedFields = ['document_type'];
   const failedFields = [];
 
-  // Only fail if document is strictly an event badge with zero student ID credentials
-  if (documentType === 'event_badge' && !institutionMatched && !nameMatched) {
+  // ── Rule 1: Document must be a student ID ──────────────────────────────────
+  if (documentType === 'event_badge') {
     return {
       status: 'FAILED',
       reason: 'invalid_document_type',
-      reasonMessage: 'The scanned document appears to be an event badge or non-student document. Please scan your college-issued student ID card.',
+      reasonMessage: 'The scanned document appears to be an event badge, participant card, or non-student document. Please scan your college-issued student ID card.',
       matchedFields: [],
       failedFields: ['document_type'],
     };
   }
 
-  // ── Automated Instant Verification (No Faculty Review) ──────────────────────
-  // Once OCR processes the college ID card, directly verify the student
+  if (documentType === 'insufficient_data') {
+    return {
+      status: 'FAILED',
+      reason: 'insufficient_ocr_data',
+      reasonMessage: 'Unable to read sufficient identity information from the document. Please ensure good lighting and hold the ID steady.',
+      matchedFields: [],
+      failedFields: ['document_readability'],
+    };
+  }
+
+  // ── Rule 2: Institution must match ────────────────────────────────────────
+  if (!institutionMatched) {
+    failedFields.push('institution');
+    return {
+      status: 'FAILED',
+      reason: 'wrong_institution',
+      reasonMessage: 'The institution on the scanned ID does not match your registered college.',
+      matchedFields,
+      failedFields,
+    };
+  }
   matchedFields.push('institution');
+
+  // ── Rule 3: Student name must match ──────────────────────────────────────
+  if (!nameMatched) {
+    failedFields.push('student_name');
+    return {
+      status: 'FAILED',
+      reason: 'name_mismatch',
+      reasonMessage: 'The name on the scanned ID does not match your registered name.',
+      matchedFields,
+      failedFields,
+    };
+  }
   matchedFields.push('student_name');
+
+  // ── Rule 4: Enrollment number ────────────────────────────────────────────
+  if (enrollmentMatch === 'mismatched') {
+    failedFields.push('enrollment_number');
+    return {
+      status: 'FAILED',
+      reason: 'enrollment_mismatch',
+      reasonMessage: 'The enrollment/roll number on the scanned ID does not match your registered enrollment number.',
+      matchedFields,
+      failedFields,
+    };
+  }
+
   matchedFields.push('enrollment_number');
 
+  // ── Direct Verification (No Faculty Review) ────────────────────────────────
+  // Instant verification once OCR identifies the valid student ID
   return {
     status: 'VERIFIED',
     reason: 'all_criteria_met',

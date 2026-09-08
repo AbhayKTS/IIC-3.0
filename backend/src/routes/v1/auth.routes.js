@@ -12,6 +12,7 @@ const loginLimiter = rateLimit({
 	max: 20,
 	standardHeaders: true,
 	legacyHeaders: false,
+	validate: { trustProxy: false },
 });
 
 router.post('/bootstrap', loginLimiter, verifyFirebaseToken, attachUserProfile, bootstrapSession);

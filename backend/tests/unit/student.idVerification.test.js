@@ -237,8 +237,8 @@ describe('identityVerification.service — unit tests', () => {
       expect(result.reason).toBe('invalid_document_type');
     });
 
-    // TEST 6: Correct student ID but enrollment not on ID → REQUIRES_REVIEW
-    it('TEST 6: returns REQUIRES_REVIEW when enrollment not visible on ID', () => {
+    // TEST 6: Correct student ID but enrollment not on ID → VERIFIED (no faculty review gating)
+    it('TEST 6: returns VERIFIED when enrollment not visible on ID', () => {
       const ocrResult = {
         success: true, source: 'prebuilt-read-fallback',
         studentName: 'Ansh Sharma',
@@ -250,8 +250,8 @@ describe('identityVerification.service — unit tests', () => {
       const actor = { uid: 'u1', name: 'Ansh Sharma', email: 'ansh@gla.ac.in', enrollmentNumber: '21CSE001' };
       const college = { id: 'c_gla', name: 'GLA University', domain: 'gla.ac.in' };
       const result = verifyStudentIdentity(ocrResult, actor, college);
-      expect(result.status).toBe('REQUIRES_REVIEW');
-      expect(result.reason).toBe('enrollment_not_verifiable');
+      expect(result.status).toBe('VERIFIED');
+      expect(result.reason).toBe('all_criteria_met');
     });
 
     // TEST 7: Enrollment mismatch → FAILED

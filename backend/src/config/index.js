@@ -37,10 +37,16 @@ const buildCorsOriginMatcher = ({ origins, allowNetlifyPreviews }) => {
 };
 
 const resolveTrustProxy = ({ nodeEnv, rawValue }) => {
-  if (nodeEnv === 'production') {
+  if (rawValue !== undefined && rawValue !== '') {
     if (rawValue === 'false') return false;
-    if (rawValue === 'true') return true;
-    return true;
+    if (rawValue === 'true') return 1;
+    const num = Number(rawValue);
+    if (!Number.isNaN(num)) return num;
+    return rawValue;
+  }
+
+  if (nodeEnv === 'production') {
+    return 1;
   }
 
   return false;

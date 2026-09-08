@@ -308,15 +308,15 @@ const verifyIdCard = async (req, res, next) => {
     const verificationResult = verifyStudentIdentity(ocrResult, actor, college);
 
     const now = new Date().toISOString();
-    const finalStatus = 'VERIFIED'; // Direct verification upon OCR completion
+    const finalStatus = verificationResult.status === 'FAILED' ? 'FAILED' : 'VERIFIED';
 
     // ── Build full idVerification document ────────────────────────────────────
     const idVerification = {
-      status: 'VERIFIED',
-      reason: 'ocr_verified',
-      reasonMessage: 'Student ID card scanned and verified successfully.',
-      matchedFields: ['institution', 'student_name', 'enrollment_number', 'document_type'],
-      failedFields: [],
+      status: finalStatus,
+      reason: verificationResult.reason || 'ocr_verified',
+      reasonMessage: verificationResult.reasonMessage || 'Student ID card scanned and verified successfully.',
+      matchedFields: verificationResult.matchedFields || ['institution', 'student_name', 'enrollment_number', 'document_type'],
+      failedFields: verificationResult.failedFields || [],
       extractedData: {
         studentName: ocrResult.studentName || actor.name || actor.displayName || null,
         rollNumber: ocrResult.rollNumber || actor.enrollmentNumber || actor.rollNumber || null,
@@ -325,13 +325,13 @@ const verifyIdCard = async (req, res, next) => {
       },
       confidence: typeof ocrResult.confidence === 'number' ? ocrResult.confidence : 0.95,
       collegeMatch: {
-        matched: true,
+        matched: verificationResult.diagnostics ? verificationResult.diagnostics.institutionMatched : true,
         extractedCollegeName: ocrResult.collegeName || college?.name || 'GLA University',
         expectedCollegeName: college?.name || 'GLA University',
       },
       source: ocrResult.source || 'azure-docint',
       submittedAt: now,
-      verifiedAt: now,
+      verifiedAt: finalStatus === 'VERIFIED' ? now : null,
       verificationMethod: 'college_email+live_id_scan',
       verificationVersion: 2,
       reviewedBy: null,
@@ -341,10 +341,17 @@ const verifyIdCard = async (req, res, next) => {
     // ── Persist to Firestore ──────────────────────────────────────────────────
     const userUpdate = {
       idVerification,
-      verificationStatus: 'verified',
-      verifiedAt: now,
       updatedAt: now,
     };
+
+    if (finalStatus === 'VERIFIED') {
+      userUpdate.verificationStatus = 'verified';
+      userUpdate.verifiedAt = now;
+    } else {
+      if (actor.verificationStatus !== 'verified') {
+        userUpdate.verificationStatus = 'unverified';
+      }
+    }
 
     try {
       await db.collection('users').doc(actor.uid).set(userUpdate, { merge: true });

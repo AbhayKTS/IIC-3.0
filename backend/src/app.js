@@ -16,7 +16,7 @@ const app = express();
 
 app.disable('x-powered-by');
 // Required when running behind load balancers or a reverse proxy.
-app.set('trust proxy', Boolean(config.server.trustProxy));
+app.set('trust proxy', config.server.trustProxy !== undefined ? config.server.trustProxy : 1);
 
 app.use(helmet({
   frameguard: { action: 'deny' },
@@ -36,6 +36,7 @@ const limiter = rateLimit({
   max: config.security.rateLimit.max,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { trustProxy: false },
 });
 app.use(limiter);
 
