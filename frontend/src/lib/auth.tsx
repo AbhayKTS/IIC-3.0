@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import type { Session, UserRole, Student, Faculty, Recruiter } from './types';
 import { api } from './mockApi';
 import { auth } from './firebase';
-import { signOut } from 'firebase/auth';
+import { signOut, onAuthStateChanged } from 'firebase/auth';
 
 interface AuthState {
   session: (Session & { user?: Student | Faculty | Recruiter }) | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: (role?: 'student' | 'faculty' | 'recruiter') => Promise<void>;
   signup: (data: { email: string; password: string; role: 'student' | 'faculty' | 'recruiter'; name: string; collegeId?: string; department?: string; company?: string; position?: string }) => Promise<void>;
   logout: () => void;
   isVerified: () => boolean;
@@ -26,10 +27,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const freshToken = await firebaseUser.getIdToken();
+          setSession((prev) => {
+            if (prev) {
+              const updated = { ...prev, token: freshToken };
+              localStorage.setItem('cv_session', JSON.stringify(updated));
+              return updated;
+            }
+            return prev;
+          });
+        } catch (e) {
+          console.warn('Failed to refresh Firebase token on auth state change', e);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   const login = useCallback(async (email: string, password: string) => {
     setLoading(true);
     try {
       const result = await api.login(email, password);
+      const sess = { role: result.role, userId: result.userId, token: result.token, user: result.user };
+      localStorage.setItem('cv_session', JSON.stringify(sess));
+      setSession(sess);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loginWithGoogle = useCallback(async (role: 'student' | 'faculty' | 'recruiter' = 'student') => {
+    setLoading(true);
+    try {
+      const result = await api.loginWithGoogle(role);
       const sess = { role: result.role, userId: result.userId, token: result.token, user: result.user };
       localStorage.setItem('cv_session', JSON.stringify(sess));
       setSession(sess);

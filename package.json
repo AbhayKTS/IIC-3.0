@@ -8,7 +8,6 @@
     "start:backend": "npm --prefix backend start",
     "dev:backend": "npm --prefix backend start",
     "dev:frontend": "npm --prefix frontend run dev",
-    "build": "echo \"Build complete\"",
     "build:frontend": "npm --prefix frontend run build",
     "test": "npm --prefix backend run test:unit",
     "test:unit": "npm --prefix backend run test:unit",
@@ -30,9 +29,5 @@
     "swagger-ui-express": "^5.0.0",
     "winston": "^3.13.0",
     "yamljs": "^0.3.0"
-  },
-  "devDependencies": {
-    "jest": "^29.7.0",
-    "supertest": "^6.3.4"
   }
 }

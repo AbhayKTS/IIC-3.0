@@ -5,7 +5,8 @@ const { incrementPlatformStats, incrementCollegeStats } = require('../services/s
 
 const getEmailDomain = (email) => {
   if (!email || !email.includes('@')) return '';
-  return email.split('@')[1].toLowerCase();
+  const domain = email.split('@')[1].trim().toLowerCase();
+  return domain.startsWith('@') ? domain.slice(1) : domain;
 };
 
 const resolveCollegeByDomain = async (domain) => {
@@ -61,7 +62,7 @@ const createUserDoc = async ({ uid, email }) => {
   const college = domain ? await resolveCollegeByDomain(domain) : null;
 
   if (!college && !roleOverride) {
-    throw new CustomError('College domain not registered', 403, 'college_domain_invalid');
+    throw new CustomError('Your college email domain is not registered.', 403, 'COLLEGE_DOMAIN_NOT_ALLOWED');
   }
 
   const role = roleOverride?.role || Roles.STUDENT;
@@ -122,6 +123,14 @@ const attachUserProfile = async (req, res, next) => {
     const userDoc = userSnap.exists
       ? { id: userSnap.id, ...userSnap.data() }
       : await createUserDoc({ uid, email });
+
+    // Validate active institution status for existing students & faculty
+    if (userDoc.collegeId && userDoc.role !== Roles.RECRUITER && userDoc.platformRole !== 'superAdmin') {
+      const collegeSnap = await db.collection('colleges').doc(userDoc.collegeId).get();
+      if (!collegeSnap.exists || collegeSnap.data()?.isActive === false) {
+        throw new CustomError('Your institution is currently inactive or disabled.', 403, 'COLLEGE_INACTIVE');
+      }
+    }
 
     req.userProfile = userDoc;
     return next();

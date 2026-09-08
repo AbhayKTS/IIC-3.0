@@ -8,6 +8,7 @@ const { getLatestSnapshot, getCollegeStats } = require('../services/analytics.se
 const { logAudit } = require('../services/audit.service');
 const { incrementPlatformStats, incrementCollegeStats } = require('../services/stats.service');
 const { normalizeStudentProfile } = require('../utils/schema');
+const { triggerN8nWorkflow } = require('../services/n8n.service');
 
 const listPendingStudents = async (req, res, next) => {
   try {
@@ -107,6 +108,15 @@ const verifyStudent = async (req, res, next) => {
         isVerified: true,
         updatedAt: new Date().toISOString(),
       }, { merge: true });
+
+      // Non-blocking trigger to n8n workflow for verified student
+      triggerN8nWorkflow('student_verified', {
+        studentId,
+        collegeId: student.collegeId,
+        email: student.email,
+        verifiedBy: actor.uid,
+        timestamp: new Date().toISOString(),
+      }).catch(() => undefined);
     }
 
     if (status === 'rejected') {

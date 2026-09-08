@@ -8,6 +8,7 @@ const seedColleges = [
   { id: 'c3', name: 'NIT Trichy', location: 'Tiruchirappalli', ranking: 8, type: 'NIT', studentCount: 6000, departments: ['CSE', 'ECE', 'Civil', 'Mechanical', 'Instrumentation'], description: 'Top NIT with strong placement record and vibrant campus life.', established: 1964, domain: 'nitt.ac.in', isActive: true },
   { id: 'c4', name: 'BITS Pilani', location: 'Pilani', ranking: 5, type: 'Private', studentCount: 4500, departments: ['CSE', 'ECE', 'EEE', 'Pharmacy', 'Economics'], description: 'Premier private university known for flexible academics and strong industry ties.', established: 1964, domain: 'bits.ac.in', isActive: true },
   { id: 'c5', name: 'DTU', location: 'New Delhi', ranking: 12, type: 'State', studentCount: 7000, departments: ['CSE', 'IT', 'ECE', 'Mechanical', 'Civil'], description: 'Delhi Technological University - a top state engineering college.', established: 1941, domain: 'dtu.ac.in', isActive: true },
+  { id: 'c_gla', name: 'GLA University', location: 'Mathura', ranking: 10, type: 'Private', studentCount: 15000, departments: ['CSE', 'ECE', 'Mechanical', 'Civil', 'Management', 'Pharmacy'], description: 'Leading university accredited with NAAC A+ grade.', established: 1998, domain: 'gla.ac.in', isActive: true },
 ];
 
 const seedStudents = [

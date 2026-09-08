@@ -7,7 +7,6 @@
   "scripts": {
     "start": "node src/server.js",
     "lint": "echo \"No lint configured\"",
-    "build": "echo \"No build step\"",
     "test": "jest -c jest.unit.config.js --runInBand",
     "test:unit": "jest -c jest.unit.config.js --runInBand",
     "test:coverage": "jest -c jest.unit.config.js --runInBand --coverage",

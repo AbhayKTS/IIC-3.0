@@ -4,7 +4,7 @@ import type {
   Placement, Notice, ChatMessage, Competition, ShortlistEntry, Session, IdVerificationData, ResumeExtractionData
 } from './types';
 import { auth } from './firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? '/api/v1' : 'http://localhost:4000/api/v1');
 
@@ -49,6 +49,53 @@ export const api = {
       return { role: role as any, userId: bootstrap.uid, token, user: { id: bootstrap.uid, email } as any };
     }
     return { role: role as any, userId: profile.id, token, user: profile as any };
+  },
+
+  async loginWithGoogle(role: 'student' | 'faculty' | 'recruiter' = 'student'): Promise<Session & { user: Student | Faculty | Recruiter }> {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    const credential = await signInWithPopup(auth, provider);
+    const user = credential.user;
+    const email = user.email || '';
+    const domain = email.split('@')[1]?.toLowerCase() || '';
+
+    // Enforce college domain for students
+    const disallowedDomains = ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com', 'protonmail.com'];
+    if (role === 'student' && (disallowedDomains.includes(domain) || (!domain.endsWith('.ac.in') && !domain.endsWith('.edu') && !domain.endsWith('.edu.in')))) {
+      await signOut(auth);
+      throw new Error(`Personal Google account (@${domain}) is not allowed. Please use your official college Google account (e.g. name@iitd.ac.in).`);
+    }
+
+    const token = await user.getIdToken();
+    try {
+      const bootstrap = await request<{ uid: string; role: string }>(
+        '/auth/bootstrap',
+        { method: 'POST', auth: true }
+      );
+      const userRole = bootstrap.role || role;
+      const profile = await getProfileByEmail(email, userRole);
+      if (!profile) {
+        return {
+          role: userRole as any,
+          userId: bootstrap.uid,
+          token,
+          user: { id: bootstrap.uid, email, name: user.displayName || email.split('@')[0] } as any,
+        };
+      }
+      return { role: userRole as any, userId: profile.id, token, user: profile as any };
+    } catch {
+      return {
+        role: role as any,
+        userId: user.uid,
+        token,
+        user: {
+          id: user.uid,
+          email,
+          name: user.displayName || email.split('@')[0],
+          verificationStatus: 'pending_review',
+        } as any,
+      };
+    }
   },
 
   // Colleges

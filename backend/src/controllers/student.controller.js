@@ -8,6 +8,7 @@ const { extractIdCardData, extractTextFromDocument } = require('../services/ocr.
 const { parseResumeData } = require('../services/resumeParser.service');
 const { logAudit } = require('../services/audit.service');
 const { Roles } = require('../utils/roles');
+const { triggerN8nWorkflow } = require('../services/n8n.service');
 
 const PROFILE_LIMITS = {
   skills: 30,
@@ -351,6 +352,18 @@ const parseResume = async (req, res, next) => {
         newSkillsAddedCount: newSkillsAdded.length,
       },
     });
+
+    // Trigger n8n workflow for resume parsing and job matching (non-blocking)
+    triggerN8nWorkflow('resume_parsed', {
+      studentId: actor.uid,
+      collegeId: actor.collegeId || null,
+      skills: mergedSkills,
+      extractedSkills: extractedSkillNames,
+      candidateName: parsedData.candidateName || null,
+      email: parsedData.email || actor.email || null,
+      method: parsedData.method,
+      timestamp: now,
+    }).catch(() => undefined);
 
     return ok(res, {
       resumeData: parsedData,
