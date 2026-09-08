@@ -153,7 +153,7 @@ export default function StudentDashboard() {
   }, [session]);
 
   // ID Card Camera Scan — called when CameraIdScanner returns a result
-  const handleIdVerified = (result: any) => {
+  const handleIdVerified = async (result: any) => {
     const verifiedResult = {
       ...result,
       status: 'VERIFIED',
@@ -183,12 +183,20 @@ export default function StudentDashboard() {
           localStorage.setItem('cv_session', JSON.stringify(sess));
         }
       }
+      
+      // Update the backend so it persists across reloads!
+      if (session?.userId) {
+        await api.updateStudent(session.userId, {
+          verificationStatus: 'verified',
+          idVerification: verifiedResult,
+        }).catch((err) => console.warn('Failed to update student verification on backend:', err));
+      }
     } catch {}
 
     toast.success('Identity verified! Your college ID has been successfully validated.');
 
     refreshUser().catch(() => null);
-    fetchDashboardData().catch(() => null);
+    await fetchDashboardData().catch(() => null);
   };
 
   // Resume Upload Handler

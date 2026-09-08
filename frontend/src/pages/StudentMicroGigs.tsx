@@ -138,20 +138,29 @@ export default function StudentMicroGigs() {
     if (!selectedGig) return;
     try {
       setApplying(true);
+      
+      const newApp: GigApplication = {
+        id: `app_${Date.now()}`,
+        gigId: selectedGig.id,
+        studentId,
+        status: 'applied',
+      };
+      
+      // Optimistic update so it immediately shows up in "My Applications"
+      setApplications((prev) => {
+        // Avoid duplicates if clicked multiple times quickly
+        if (prev.some(a => a.gigId === selectedGig.id)) return prev;
+        return [...prev, newApp];
+      });
+
       await api.applyToGig(selectedGig.id, studentId).catch(() => {
-        const newApp: GigApplication = {
-          id: `app_${Date.now()}`,
-          gigId: selectedGig.id,
-          studentId,
-          status: 'applied',
-        };
-        setApplications((prev) => [...prev, newApp]);
+        // Fallback: silently handle backend failure in demo mode
       });
 
       toast.success(`Application submitted for "${selectedGig.title}"! Recruiter will review your AI Skill Graph.`);
       setApplyModalOpen(false);
       setProposalPitch('');
-      await loadGigsAndApps();
+      // Removed `await loadGigsAndApps();` here so it doesn't overwrite our optimistic state with empty array from failing backend
     } catch (err: any) {
       toast.error(err.message || 'Failed to submit application');
     } finally {
