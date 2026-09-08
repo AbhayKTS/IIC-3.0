@@ -1,0 +1,16 @@
+node_modules
+coverage
+logs
+tests
+scripts
+.git
+.github
+.env*
+!.env.example
+frontend
+*.md
+*.docx
+jest.*.js
+firestore.*
+firebase,txt
+*.log

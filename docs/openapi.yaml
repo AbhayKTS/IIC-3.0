@@ -1,0 +1,1141 @@
+openapi: 3.0.3
+info:
+  title: CollegeVerse API
+  version: 1.0.0
+  description: Public API specification for CollegeVerse backend.
+servers:
+  - url: /api/v1
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Firebase ID token in Authorization header.
+  responses:
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+      required: [success, data]
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+            code:
+              type: string
+            details:
+              nullable: true
+          description: error.code is the errorCode used across responses.
+          required: [message, code]
+      required: [success, error]
+    User:
+      type: object
+      properties:
+        uid:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        subRole:
+          nullable: true
+        collegeId:
+          nullable: true
+        verificationStatus:
+          type: string
+        schemaVersion:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    StudentProfile:
+      type: object
+      properties:
+        userId:
+          type: string
+        collegeId:
+          type: string
+        profileVisibility:
+          type: string
+        skills:
+          type: array
+          items: { type: string }
+        categoryScores:
+          type: object
+        totalScore:
+          type: number
+        overallScore:
+          type: number
+        schemaVersion:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    Event:
+      type: object
+      properties:
+        eventId:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        collegeId:
+          type: string
+        createdBy:
+          type: string
+        startDate:
+          type: string
+        endDate:
+          type: string
+        registrationDeadline:
+          type: string
+        maxParticipants:
+          nullable: true
+        isTeamEvent:
+          type: boolean
+        status:
+          type: string
+        participantsCount:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    Team:
+      type: object
+      properties:
+        teamId:
+          type: string
+        eventId:
+          type: string
+        collegeId:
+          type: string
+        teamName:
+          type: string
+        createdBy:
+          type: string
+        maxMembers:
+          type: integer
+        currentMembersCount:
+          type: integer
+        status:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    Club:
+      type: object
+      properties:
+        clubId:
+          type: string
+        collegeId:
+          type: string
+        name:
+          type: string
+        nameLower:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        createdBy:
+          type: string
+        approvedBy:
+          nullable: true
+        status:
+          type: string
+        membersCount:
+          type: integer
+        schemaVersion:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    JobPost:
+      type: object
+      properties:
+        jobId:
+          type: string
+        companyId:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        jobType:
+          type: string
+        eligibleColleges:
+          oneOf:
+            - type: string
+            - type: array
+              items: { type: string }
+        minimumScore:
+          nullable: true
+        requiredSkills:
+          type: array
+          items: { type: string }
+        status:
+          type: string
+        applicationDeadline:
+          type: string
+        schemaVersion:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    JobApplication:
+      type: object
+      properties:
+        applicationId:
+          type: string
+        jobId:
+          type: string
+        userId:
+          type: string
+        collegeId:
+          type: string
+        applicationStatus:
+          type: string
+        appliedAt:
+          type: string
+        updatedAt:
+          type: string
+        studentSnapshot:
+          type: object
+    Notification:
+      type: object
+      properties:
+        notificationId:
+          type: string
+        userId:
+          type: string
+        type:
+          type: string
+        title:
+          type: string
+        message:
+          type: string
+        referenceId:
+          type: string
+        isRead:
+          type: boolean
+        createdAt:
+          type: string
+    AnalyticsSnapshot:
+      type: object
+      properties:
+        snapshotId:
+          type: string
+        snapshotType:
+          type: string
+        collegeId:
+          nullable: true
+        totalUsers:
+          type: integer
+        totalStudents:
+          type: integer
+        totalVerifiedStudents:
+          type: integer
+        totalFaculty:
+          type: integer
+        totalRecruiters:
+          type: integer
+        totalEvents:
+          type: integer
+        totalClubs:
+          type: integer
+        totalTeams:
+          type: integer
+        totalJobPosts:
+          type: integer
+        totalApplications:
+          type: integer
+        averageScore:
+          type: number
+        createdAt:
+          type: string
+    AuditLog:
+      type: object
+      properties:
+        logId:
+          type: string
+        actionType:
+          type: string
+        performedBy:
+          type: string
+        performedByRole:
+          type: string
+        targetId:
+          nullable: true
+        targetType:
+          type: string
+        collegeId:
+          nullable: true
+        metadata:
+          type: object
+        createdAt:
+          type: string
+
+paths:
+  /health:
+    get:
+      tags: [public]
+      security: []
+      servers:
+        - url: /
+      summary: Health check
+      responses:
+        '200':
+          description: Health response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+  /status:
+    get:
+      tags: [public]
+      security: []
+      summary: Service status
+      responses:
+        '200':
+          description: Status response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /auth/bootstrap:
+    post:
+      tags: [public]
+      summary: Bootstrap session
+      responses:
+        '200':
+          description: Session bootstrap response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /student/me:
+    get:
+      tags: [student]
+      summary: Get student overview
+      responses:
+        '200':
+          description: Student overview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /student/profile:
+    get:
+      tags: [student]
+      summary: Get student profile
+      responses:
+        '200':
+          description: Student profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+    post:
+      tags: [student]
+      summary: Create student profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudentProfile'
+      responses:
+        '200':
+          description: Created profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+    put:
+      tags: [student]
+      summary: Update student profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudentProfile'
+      responses:
+        '200':
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /student/events/{eventId}/register:
+    post:
+      tags: [student]
+      summary: Register for event
+      parameters:
+        - in: path
+          name: eventId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Registration success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+  /student/events/{eventId}/cancel:
+    post:
+      tags: [student]
+      summary: Cancel event registration
+      parameters:
+        - in: path
+          name: eventId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Cancellation success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+  /student/events/{eventId}/create-team:
+    post:
+      tags: [student]
+      summary: Create team for event
+      parameters:
+        - in: path
+          name: eventId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                teamName:
+                  type: string
+                maxMembers:
+                  type: integer
+              required: [teamName, maxMembers]
+      responses:
+        '200':
+          description: Team created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /student/teams/{teamId}/request-join:
+    post:
+      tags: [student]
+      summary: Request to join team
+      parameters:
+        - in: path
+          name: teamId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Request created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+  /student/teams/{teamId}/approve/{requestId}:
+    post:
+      tags: [student]
+      summary: Approve team join request
+      parameters:
+        - in: path
+          name: teamId
+          required: true
+          schema: { type: string }
+        - in: path
+          name: requestId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Request approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /student/clubs/apply:
+    post:
+      tags: [student]
+      summary: Apply for club
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                description: { type: string }
+                category: { type: string }
+              required: [name, description, category]
+      responses:
+        '200':
+          description: Club application created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /student/clubs/{clubId}/join:
+    post:
+      tags: [student]
+      summary: Join club
+      parameters:
+        - in: path
+          name: clubId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Joined club
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+  /student/clubs/{clubId}/leave:
+    post:
+      tags: [student]
+      summary: Leave club
+      parameters:
+        - in: path
+          name: clubId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Left club
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /student/jobs/{jobId}/apply:
+    post:
+      tags: [student]
+      summary: Apply to job
+      parameters:
+        - in: path
+          name: jobId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Job application created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /student/applications:
+    get:
+      tags: [student]
+      summary: List student applications
+      responses:
+        '200':
+          description: Applications list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /student/communities:
+    post:
+      tags: [student]
+      summary: Create student community
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                description: { type: string }
+                visibility: { type: string }
+              required: [name, description]
+      responses:
+        '200':
+          description: Community created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /faculty/pending-students:
+    get:
+      tags: [faculty]
+      summary: List pending students
+      responses:
+        '200':
+          description: Pending students
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /faculty/verify-student:
+    post:
+      tags: [faculty]
+      summary: Verify student
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                studentId: { type: string }
+                status: { type: string, enum: [verified, rejected] }
+              required: [studentId, status]
+      responses:
+        '200':
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /faculty/student/{id}:
+    get:
+      tags: [faculty]
+      summary: Get student profile for faculty
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Student profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /faculty/events:
+    post:
+      tags: [faculty]
+      summary: Create event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Event'
+      responses:
+        '200':
+          description: Event created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /faculty/clubs/{clubId}/approve:
+    post:
+      tags: [faculty]
+      summary: Approve club
+      parameters:
+        - in: path
+          name: clubId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Club approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+  /faculty/clubs/{clubId}/reject:
+    post:
+      tags: [faculty]
+      summary: Reject club
+      parameters:
+        - in: path
+          name: clubId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Club rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /faculty/communities:
+    post:
+      tags: [faculty]
+      summary: Create faculty community
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                description: { type: string }
+                type: { type: string }
+                visibility: { type: string }
+              required: [name, description, type]
+      responses:
+        '200':
+          description: Community created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /faculty/analytics:
+    get:
+      tags: [faculty]
+      summary: Get college analytics
+      responses:
+        '200':
+          description: College analytics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /faculty/audit-logs:
+    get:
+      tags: [faculty]
+      summary: Get college audit logs
+      parameters:
+        - in: query
+          name: actionType
+          schema: { type: string }
+        - in: query
+          name: performedBy
+          schema: { type: string }
+        - in: query
+          name: startDate
+          schema: { type: string }
+        - in: query
+          name: endDate
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer }
+        - in: query
+          name: cursor
+          schema: { type: string }
+      responses:
+        '200':
+          description: Audit logs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /recruiter/student/{id}:
+    get:
+      tags: [recruiter]
+      summary: Get student profile for recruiter
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Student profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /recruiter/search:
+    get:
+      tags: [recruiter]
+      summary: Search students
+      parameters:
+        - in: query
+          name: skills
+          schema: { type: string }
+        - in: query
+          name: collegeId
+          schema: { type: string }
+        - in: query
+          name: minScore
+          schema: { type: number }
+        - in: query
+          name: category
+          schema: { type: string }
+        - in: query
+          name: sortBy
+          schema: { type: string }
+        - in: query
+          name: order
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer }
+        - in: query
+          name: cursor
+          schema: { type: string }
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /recruiter/jobs:
+    post:
+      tags: [recruiter]
+      summary: Create job post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobPost'
+      responses:
+        '200':
+          description: Job created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /recruiter/jobs/{jobId}/shortlist/{applicationId}:
+    post:
+      tags: [recruiter]
+      summary: Shortlist job application
+      parameters:
+        - in: path
+          name: jobId
+          required: true
+          schema: { type: string }
+        - in: path
+          name: applicationId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Shortlisted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /recruiter/jobs/{jobId}/applications:
+    get:
+      tags: [recruiter]
+      summary: List job applications
+      parameters:
+        - in: path
+          name: jobId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Job applications
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /admin/faculty:
+    post:
+      tags: [admin]
+      summary: Create faculty user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                uid: { type: string }
+                email: { type: string }
+                designation: { type: string }
+                department: { type: string }
+              required: [uid, email]
+      responses:
+        '200':
+          description: Faculty created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /admin/recalculate-rankings:
+    post:
+      tags: [admin]
+      summary: Recalculate leaderboard rankings
+      responses:
+        '200':
+          description: Recalculated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /admin/analytics:
+    get:
+      tags: [admin]
+      summary: Get platform analytics
+      responses:
+        '200':
+          description: Platform analytics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /admin/generate-analytics:
+    post:
+      tags: [admin]
+      summary: Generate platform analytics snapshot
+      responses:
+        '200':
+          description: Snapshot generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /admin/audit-logs:
+    get:
+      tags: [admin]
+      summary: Get audit logs
+      parameters:
+        - in: query
+          name: actionType
+          schema: { type: string }
+        - in: query
+          name: collegeId
+          schema: { type: string }
+        - in: query
+          name: performedBy
+          schema: { type: string }
+        - in: query
+          name: startDate
+          schema: { type: string }
+        - in: query
+          name: endDate
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer }
+        - in: query
+          name: cursor
+          schema: { type: string }
+      responses:
+        '200':
+          description: Audit logs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /admin/change-role:
+    post:
+      tags: [admin]
+      summary: Change user role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                targetUserId: { type: string }
+                role: { type: string }
+                subRole: { type: string }
+              required: [targetUserId, role]
+      responses:
+        '200':
+          description: Role changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /events:
+    get:
+      tags: [public]
+      summary: List events
+      parameters:
+        - in: query
+          name: category
+          schema: { type: string }
+        - in: query
+          name: collegeId
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: upcomingOnly
+          schema: { type: string }
+        - in: query
+          name: sortBy
+          schema: { type: string }
+      responses:
+        '200':
+          description: Events list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /communities/{id}/messages:
+    get:
+      tags: [public]
+      summary: List community messages
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Message list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /user/notifications:
+    get:
+      tags: [public]
+      summary: List notifications
+      responses:
+        '200':
+          description: Notifications list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /user/notifications/{id}/read:
+    post:
+      tags: [public]
+      summary: Mark notification read
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Notification updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /user/notifications/read-all:
+    post:
+      tags: [public]
+      summary: Mark all notifications read
+      responses:
+        '200':
+          description: Notifications updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /user/communities/{communityId}/join:
+    post:
+      tags: [public]
+      summary: Join community
+      parameters:
+        - in: path
+          name: communityId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Joined community
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /user/communities/{communityId}/leave:
+    post:
+      tags: [public]
+      summary: Leave community
+      parameters:
+        - in: path
+          name: communityId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Left community
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'

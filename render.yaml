@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: collegeverse-api
+    runtime: node
+    region: singapore
+    plan: free
+    buildCommand: npm ci --omit=dev
+    startCommand: node src/server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8080
+      - key: FIREBASE_PROJECT_ID
+        value: collegeverse-99d69
+      - key: GOOGLE_CLOUD_PROJECT
+        value: collegeverse-99d69
+      - key: CORS_ORIGIN
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GOOGLE_APPLICATION_CREDENTIALS_JSON
+        sync: false

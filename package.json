@@ -1,0 +1,44 @@
+{
+  "name": "collegeverse-backend",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/server.js",
+    "lint": "echo \"No lint configured\"",
+    "build": "echo \"No build step\"",
+    "test": "jest -c jest.unit.config.js --runInBand",
+    "test:unit": "jest -c jest.unit.config.js --runInBand",
+    "test:coverage": "jest -c jest.unit.config.js --runInBand --coverage",
+    "test:integration": "firebase emulators:exec --project demo-test --only firestore,auth \"jest -c jest.integration.config.js --runInBand\"",
+    "test:watch": "jest -c jest.unit.config.js --watch",
+    "firebase:preflight": "NODE_ENV=development node scripts/firebasePreflight.js",
+    "seed:demo": "NODE_ENV=development node scripts/seedDemo.js",
+    "seed:data": "NODE_ENV=development node scripts/seedDemoData.js",
+    "seed:firestore": "NODE_ENV=development node scripts/seedFirestore.js"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.16.0",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.2.0",
+    "firebase": "^12.9.0",
+    "firebase-admin": "^12.2.0",
+    "helmet": "^7.1.0",
+    "socket.io": "^4.7.5",
+    "swagger-ui-express": "^5.0.0",
+    "winston": "^3.13.0",
+    "yamljs": "^0.3.0"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^6.1.0",
+    "@openzeppelin/contracts": "^5.4.0",
+    "firebase-tools": "^13.8.0",
+    "hardhat": "^3.1.8",
+    "jest": "^29.7.0",
+    "supertest": "^6.3.4"
+  }
+}
