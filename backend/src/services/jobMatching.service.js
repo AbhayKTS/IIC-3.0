@@ -27,9 +27,22 @@ async function matchJobsForStudent(studentId) {
       ...(Array.isArray(profileData.skills) ? profileData.skills : []),
     ];
 
+    // Coding profile evidence
+    const codingProfiles = profileData.codingProfiles || userData.codingProfiles || {};
+    const codingEvidence = profileData.codingSkillEvidence || userData.codingSkillEvidence || {};
+
     const studentSkillsLower = new Set(
       rawSkills.map((s) => (typeof s === 'string' ? s : s?.name || '').trim().toLowerCase()).filter(Boolean)
     );
+
+    // Add skills with strong coding evidence (>= 5 solved problems) as verifiable supporting evidence
+    const verifiedCodingSkills = new Set();
+    for (const [skillName, count] of Object.entries(codingEvidence)) {
+      if (count >= 5) {
+        studentSkillsLower.add(skillName.toLowerCase());
+        verifiedCodingSkills.add(skillName.toLowerCase());
+      }
+    }
 
     // 2. Fetch open jobs
     const jobsSnap = await db.collection('jobs').where('status', '==', 'open').limit(25).get();
@@ -47,12 +60,23 @@ async function matchJobsForStudent(studentId) {
 
       let matchScore = 0;
       let matchingSkills = [];
+      let hasCodingEvidence = false;
 
       if (requiredSkills.length > 0) {
-        matchingSkills = requiredSkills.filter((req) =>
-          studentSkillsLower.has(String(req).trim().toLowerCase())
-        );
+        matchingSkills = requiredSkills.filter((req) => {
+          const reqLower = String(req).trim().toLowerCase();
+          const matched = studentSkillsLower.has(reqLower);
+          if (matched && verifiedCodingSkills.has(reqLower)) {
+            hasCodingEvidence = true;
+          }
+          return matched;
+        });
         matchScore = Math.round((matchingSkills.length / requiredSkills.length) * 100);
+
+        // Supporting evidence boost: up to +5 points for verified practical coding evidence
+        if (hasCodingEvidence && matchScore < 100) {
+          matchScore = Math.min(100, matchScore + 5);
+        }
       } else if (studentSkillsLower.size > 0) {
         // Job has no specific requirements — generally relevant if student has skills
         matchScore = 50;
@@ -60,9 +84,13 @@ async function matchJobsForStudent(studentId) {
 
       // Only recommend jobs with at least 30% match
       if (matchScore >= 30) {
-        const reason = matchingSkills.length > 0
+        let reason = matchingSkills.length > 0
           ? `Matches ${matchingSkills.length} of ${requiredSkills.length} required skills: ${matchingSkills.slice(0, 4).join(', ')}`
           : 'Relevant opportunity matching your educational profile';
+
+        if (hasCodingEvidence) {
+          reason += ' (supported by verified coding profile evidence)';
+        }
 
         const recommendation = {
           studentId,

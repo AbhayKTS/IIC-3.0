@@ -149,6 +149,8 @@ const getStudentOverview = async (req, res, next) => {
       idVerification: actor.idVerification || null,
       resumeExtraction: actor.resumeExtraction || null,
       skills: actor.skills || profile?.skills || [],
+      codingProfiles: profile?.codingProfiles || actor.codingProfiles || null,
+      codingSkillEvidence: profile?.codingSkillEvidence || actor.codingSkillEvidence || null,
       notifications,
       recommendations,
     });

@@ -57,6 +57,8 @@ router.get('/student/:studentId', async (req, res, next) => {
       education: profileData.education || [],
       experience: profileData.experience || [],
       projects: profileData.projects || [],
+      codingProfiles: profileData.codingProfiles || userData.codingProfiles || null,
+      codingSkillEvidence: profileData.codingSkillEvidence || userData.codingSkillEvidence || null,
     });
   } catch (error) {
     return next(error);

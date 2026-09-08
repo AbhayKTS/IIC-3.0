@@ -71,6 +71,47 @@ export interface ResumeExtractionData {
   extractedAt?: string;
 }
 
+export interface LeetCodeStats {
+  username: string;
+  profileUrl: string;
+  fetchedAt: string | null;
+  totalSolved: number;
+  easy: number;
+  medium: number;
+  hard: number;
+  languages: Record<string, number>;
+  skills: Record<string, number>;
+  source: 'public_profile';
+  status: 'connected' | 'error' | 'not_connected';
+  error: string | null;
+}
+
+export interface CodeforcesStats {
+  handle: string;
+  profileUrl: string;
+  fetchedAt: string | null;
+  rating: number | null;
+  maxRating: number | null;
+  rank: string | null;
+  maxRank: string | null;
+  totalSolved: number;
+  ratingBuckets: Record<string, number>;
+  tags: Record<string, number>;
+  languages: Record<string, number>;
+  contests: {
+    participated: number;
+    rated: number;
+  };
+  source: 'official_api';
+  status: 'connected' | 'error' | 'not_connected';
+  error: string | null;
+}
+
+export interface CodingProfiles {
+  leetcode: LeetCodeStats | null;
+  codeforces: CodeforcesStats | null;
+}
+
 export interface Student {
   id: string; name: string; email: string; password: string;
   collegeId: string; verificationStatus: VerificationStatus;
@@ -83,6 +124,8 @@ export interface Student {
   bio?: string;
   idVerification?: IdVerificationData;
   resumeExtraction?: ResumeExtractionData;
+  codingProfiles?: CodingProfiles;
+  codingSkillEvidence?: Record<string, number>;
 }
 
 export interface Faculty {

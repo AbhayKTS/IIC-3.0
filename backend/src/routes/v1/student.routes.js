@@ -8,6 +8,11 @@ const {
   verifyIdCard,
   parseResume,
 } = require('../../controllers/student.controller');
+const {
+  updateCodingProfiles,
+  getCodingProfiles,
+  refreshCodingProfiles,
+} = require('../../controllers/codingProfile.controller');
 const { registerForEvent, cancelEventRegistration } = require('../../controllers/events.controller');
 const {
   applyForClub,
@@ -81,6 +86,30 @@ router.get(
   attachUserProfile,
   requireRole([Roles.STUDENT]),
   getStudentProfile
+);
+
+router.get(
+  '/coding-profiles',
+  verifyFirebaseToken,
+  attachUserProfile,
+  requireRole([Roles.STUDENT]),
+  getCodingProfiles
+);
+
+router.put(
+  '/coding-profiles',
+  verifyFirebaseToken,
+  attachUserProfile,
+  requireRole([Roles.STUDENT]),
+  updateCodingProfiles
+);
+
+router.post(
+  '/coding-profiles/refresh',
+  verifyFirebaseToken,
+  attachUserProfile,
+  requireRole([Roles.STUDENT]),
+  refreshCodingProfiles
 );
 
 router.post(

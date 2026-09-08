@@ -16,7 +16,7 @@ export default function Login() {
       icon: <GraduationCap className="h-8 w-8" />,
       href: '/login/student',
       color: 'text-primary',
-      demoUser: 'Arjun Sharma (IIT Delhi)',
+      demoUser: null,
     },
     {
       label: 'College Faculty',
@@ -113,9 +113,15 @@ export default function Login() {
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold text-foreground text-sm">{r.label}</h3>
-                    <span className="text-[10px] font-mono text-muted-foreground bg-secondary px-2 py-0.5 rounded">
-                      Demo: {r.demoUser}
-                    </span>
+                    {r.demoUser ? (
+                      <span className="text-[10px] font-mono text-muted-foreground bg-secondary px-2 py-0.5 rounded">
+                        Demo: {r.demoUser}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-mono text-emerald-500/90 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">
+                        Official College Login
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">{r.desc}</p>
                 </div>

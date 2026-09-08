@@ -15,6 +15,8 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import CameraIdScanner from '@/components/CameraIdScanner';
+import CodingProfilesSection from '@/components/CodingProfilesSection';
+import type { IdVerificationData, ResumeExtractionData, JobRecommendation, AppNotification, CodingProfiles } from '@/lib/types';
 import {
   CheckCircle2,
   Clock,
@@ -53,6 +55,8 @@ interface StudentOverviewData {
   idVerification: IdVerificationData | null;
   resumeExtraction: ResumeExtractionData | null;
   skills: string[];
+  codingProfiles?: CodingProfiles | null;
+  codingSkillEvidence?: Record<string, number> | null;
   notifications: AppNotification[];
   recommendations: JobRecommendation[];
 }
@@ -693,6 +697,14 @@ export default function StudentDashboard() {
                 )}
               </div>
             </div>
+
+            {/* CODING PROFILES & VERIFIED STATS */}
+            <CodingProfilesSection
+              initialData={overview?.codingProfiles}
+              onUpdated={(newProfiles) =>
+                setOverview((prev) => (prev ? { ...prev, codingProfiles: newProfiles } : prev))
+              }
+            />
 
             {/* F. SKILLS DISPLAY */}
             <div className="glass-card p-6 rounded-xl border border-border space-y-4">

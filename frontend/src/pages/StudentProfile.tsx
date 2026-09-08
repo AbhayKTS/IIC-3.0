@@ -67,8 +67,17 @@ export default function StudentProfile() {
           leetcode: leetcodeHandle,
           codeforces: codeforcesHandle,
         }).catch(() => null);
+
+        await api.updateCodingProfiles({
+          leetcodeUsername: leetcodeHandle.trim() || undefined,
+          codeforcesHandle: codeforcesHandle.trim() || undefined,
+        }).catch((err) => {
+          console.warn('Coding profile sync warning:', err);
+        });
       }
-      toast.success('Coding accounts linked to AlmaDox Points Engine!');
+      toast.success('Coding accounts verified & synced to AI Points Engine!');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update coding accounts');
     } finally {
       setSavingHandles(false);
     }
@@ -80,7 +89,22 @@ export default function StudentProfile() {
       const studentId = session?.userId;
       if (studentId) {
         const data = await api.getStudentById(studentId);
-        if (data) setProfile(data);
+        if (data) {
+          setProfile(data);
+          if (data.github) setGithubHandle(data.github);
+          if (data.leetcode) setLeetcodeHandle(data.leetcode);
+          if (data.codeforces) setCodeforcesHandle(data.codeforces);
+        }
+
+        const coding = await api.getCodingProfiles().catch(() => null);
+        if (coding?.codingProfiles) {
+          if (coding.codingProfiles.leetcode?.username) {
+            setLeetcodeHandle(coding.codingProfiles.leetcode.username);
+          }
+          if (coding.codingProfiles.codeforces?.handle) {
+            setCodeforcesHandle(coding.codingProfiles.codeforces.handle);
+          }
+        }
       }
     } catch {
       // Fallback: session student

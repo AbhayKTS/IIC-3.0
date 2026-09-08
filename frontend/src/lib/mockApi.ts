@@ -2,7 +2,7 @@ import type {
   College, Institution, Student, Faculty, Recruiter, Gig, GigApplication,
   MarketplaceItem, WalletSBT, Community, Club, Event, Team,
   Placement, Notice, ChatMessage, Competition, ShortlistEntry, Session, IdVerificationData, ResumeExtractionData,
-  JobRecommendation, AppNotification
+  JobRecommendation, AppNotification, CodingProfiles
 } from './types';
 import { auth } from './firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
@@ -140,20 +140,6 @@ export const DEMO_ACCOUNTS: Record<string, { role: UserRole; user: any }> = {
       hiredCount: 9,
       activeGigsCount: 5,
       targetSkills: ['Solidity', 'Rust', 'TypeScript', 'Cryptography', 'Smart Contracts', 'React'],
-    },
-  },
-  'arjun@iitd.ac.in': {
-    role: 'student',
-    user: {
-      id: 's1',
-      name: 'Arjun Sharma',
-      email: 'arjun@iitd.ac.in',
-      collegeId: 'c1',
-      verificationStatus: 'verified',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Arjun',
-      skills: ['React', 'Python', 'Machine Learning', 'Solidity'],
-      points: { cultural: 85, sports: 60, education: 92, coding: 88 },
-      bio: 'Final year CS student passionate about AI and Web3 infrastructure.',
     },
   },
 };
@@ -315,10 +301,30 @@ export const api = {
     idVerification: IdVerificationData | null;
     resumeExtraction: ResumeExtractionData | null;
     skills: string[];
+    codingProfiles?: CodingProfiles | null;
+    codingSkillEvidence?: Record<string, number> | null;
     notifications: AppNotification[];
     recommendations: JobRecommendation[];
   }> {
     return request('/student/me', { auth: true });
+  },
+
+  // Coding Profiles
+  async getCodingProfiles(): Promise<{ codingProfiles: CodingProfiles }> {
+    return request('/student/coding-profiles', { auth: true });
+  },
+  async updateCodingProfiles(data: { leetcodeUsername?: string; codeforcesHandle?: string }): Promise<{ codingProfiles: CodingProfiles }> {
+    return request('/student/coding-profiles', {
+      method: 'PUT',
+      body: data,
+      auth: true,
+    });
+  },
+  async refreshCodingProfiles(): Promise<{ codingProfiles: CodingProfiles }> {
+    return request('/student/coding-profiles/refresh', {
+      method: 'POST',
+      auth: true,
+    });
   },
 
   // Verification
