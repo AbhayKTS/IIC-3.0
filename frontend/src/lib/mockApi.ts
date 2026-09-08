@@ -47,6 +47,117 @@ const request = async <T>(path: string, options: { method?: string; body?: any; 
   return (payload?.data !== undefined ? payload.data : payload) as T;
 };
 
+export const DEMO_ACCOUNTS: Record<string, { role: UserRole; user: any }> = {
+  'rajesh@iitd.ac.in': {
+    role: 'faculty',
+    user: {
+      id: 'f1',
+      name: 'Dr. Rajesh Gupta',
+      email: 'rajesh@iitd.ac.in',
+      collegeId: 'c1',
+      collegeName: 'IIT Delhi',
+      department: 'Computer Science & Engineering',
+      role: 'admin',
+      college: {
+        id: 'c1',
+        name: 'IIT Delhi',
+        location: 'New Delhi, India',
+        ranking: 1,
+        type: 'IIT',
+        studentCount: 8500,
+        facultyCount: 640,
+        placementRate: 98,
+        departments: ['Computer Science & Engineering', 'Electrical Engineering', 'Mechanical Engineering', 'Mathematics & Computing'],
+        description: 'Premier engineering institute known for cutting-edge research, startup innovation, and global engineering leadership.',
+        established: 1961,
+        domain: 'iitd.ac.in',
+        contactEmail: 'placements@iitd.ac.in',
+        website: 'https://home.iitd.ac.in',
+      },
+    },
+  },
+  'dean@gla.ac.in': {
+    role: 'faculty',
+    user: {
+      id: 'f_gla',
+      name: 'Dr. A. K. Sharma',
+      email: 'dean@gla.ac.in',
+      collegeId: 'c_gla',
+      collegeName: 'GLA University',
+      department: 'Computer Science & Engineering',
+      role: 'admin',
+      college: {
+        id: 'c_gla',
+        name: 'GLA University',
+        location: 'Mathura, Uttar Pradesh, India',
+        ranking: 10,
+        type: 'Private University (NAAC A+)',
+        studentCount: 15200,
+        facultyCount: 720,
+        placementRate: 92,
+        departments: ['Computer Science & Engineering', 'Electronics & Communication', 'Information Technology', 'Civil Engineering', 'Mechanical Engineering'],
+        description: 'Leading university accredited with NAAC A+ grade, empowering world-class engineering graduates.',
+        established: 1998,
+        domain: 'gla.ac.in',
+        contactEmail: 'dean.academics@gla.ac.in',
+        website: 'https://www.gla.ac.in',
+      },
+    },
+  },
+  'vikram@techcorp.com': {
+    role: 'recruiter',
+    user: {
+      id: 'r1',
+      name: 'Vikram Mehta',
+      email: 'vikram@techcorp.com',
+      company: 'TechCorp Labs',
+      position: 'Director of Engineering Talent',
+      companyDescription: 'Global enterprise cloud and AI engineering lab recruiting top 1% software talent directly across Indian universities.',
+      location: 'Bengaluru, India / Hybrid',
+      website: 'https://techcorp.com',
+      phone: '+91 98765 43210',
+      openPositions: 5,
+      shortlistedCount: 14,
+      hiredCount: 6,
+      activeGigsCount: 3,
+      targetSkills: ['React', 'TypeScript', 'Node.js', 'Python', 'Go', 'Distributed Systems'],
+    },
+  },
+  'hiring@polygon.technology': {
+    role: 'recruiter',
+    user: {
+      id: 'r2',
+      name: 'Ananya Das',
+      email: 'hiring@polygon.technology',
+      company: 'Polygon Labs',
+      position: 'Web3 & Talent Acquisition Lead',
+      companyDescription: 'Leading Ethereum scaling protocol building zkEVM infrastructure and onboarding the next billion web3 builders.',
+      location: 'Remote / Global',
+      website: 'https://polygon.technology',
+      phone: '+91 99887 76655',
+      openPositions: 8,
+      shortlistedCount: 22,
+      hiredCount: 9,
+      activeGigsCount: 5,
+      targetSkills: ['Solidity', 'Rust', 'TypeScript', 'Cryptography', 'Smart Contracts', 'React'],
+    },
+  },
+  'arjun@iitd.ac.in': {
+    role: 'student',
+    user: {
+      id: 's1',
+      name: 'Arjun Sharma',
+      email: 'arjun@iitd.ac.in',
+      collegeId: 'c1',
+      verificationStatus: 'verified',
+      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Arjun',
+      skills: ['React', 'Python', 'Machine Learning', 'Solidity'],
+      points: { cultural: 85, sports: 60, education: 92, coding: 88 },
+      bio: 'Final year CS student passionate about AI and Web3 infrastructure.',
+    },
+  },
+};
+
 const getProfileByEmail = async (email: string, role: string) => {
   return request<Student | Faculty | Recruiter | null>(`/compat/profile?email=${encodeURIComponent(email)}&role=${encodeURIComponent(role)}`);
 };
@@ -54,18 +165,64 @@ const getProfileByEmail = async (email: string, role: string) => {
 export const api = {
   // Auth
   async login(email: string, password: string): Promise<Session & { user: Student | Faculty | Recruiter }> {
-    const credential = await signInWithEmailAndPassword(auth, email, password);
-    const token = await credential.user.getIdToken();
-    const bootstrap = await request<{ uid: string; role: string }>(
-      '/auth/bootstrap',
-      { method: 'POST', auth: true }
-    );
-    const role = bootstrap.role || 'student';
-    const profile = await getProfileByEmail(email, role);
-    if (!profile) {
-      return { role: role as any, userId: bootstrap.uid, token, user: { id: bootstrap.uid, email } as any };
+    const trimmedEmail = email.trim().toLowerCase();
+
+    // 1. Try real Firebase Auth credentials
+    try {
+      const credential = await signInWithEmailAndPassword(auth, email, password);
+      const token = await credential.user.getIdToken();
+      let role = 'student';
+      try {
+        const bootstrap = await request<{ uid: string; role: string }>(
+          '/auth/bootstrap',
+          { method: 'POST', auth: true }
+        );
+        if (bootstrap?.role) role = bootstrap.role;
+      } catch (_) {}
+
+      const profile = await getProfileByEmail(email, role);
+      if (!profile) {
+        if (DEMO_ACCOUNTS[trimmedEmail]) {
+          return {
+            role: DEMO_ACCOUNTS[trimmedEmail].role,
+            userId: credential.user.uid,
+            token,
+            user: { ...DEMO_ACCOUNTS[trimmedEmail].user, id: credential.user.uid, email },
+          };
+        }
+        return {
+          role: role as any,
+          userId: credential.user.uid,
+          token,
+          user: { id: credential.user.uid, email, name: credential.user.displayName || email.split('@')[0] } as any,
+        };
+      }
+      return { role: role as any, userId: profile.id, token, user: profile as any };
+    } catch (firebaseErr: any) {
+      // 2. Demo accounts fallback if Firebase Auth user does not exist or fails
+      if (DEMO_ACCOUNTS[trimmedEmail]) {
+        const demo = DEMO_ACCOUNTS[trimmedEmail];
+        const fakeToken = `demo_token_${Date.now()}`;
+        return {
+          role: demo.role,
+          userId: demo.user.id,
+          token: fakeToken,
+          user: demo.user,
+        };
+      }
+      throw firebaseErr;
     }
-    return { role: role as any, userId: profile.id, token, user: profile as any };
+  },
+
+  async loginDemo(demoEmail: string): Promise<Session & { user: Student | Faculty | Recruiter }> {
+    const trimmed = demoEmail.trim().toLowerCase();
+    const demo = DEMO_ACCOUNTS[trimmed] || DEMO_ACCOUNTS['rajesh@iitd.ac.in'];
+    return {
+      role: demo.role,
+      userId: demo.user.id,
+      token: `demo_token_${Date.now()}`,
+      user: demo.user,
+    };
   },
 
   async loginWithGoogle(role: 'student' | 'faculty' | 'recruiter' = 'student'): Promise<Session & { user: Student | Faculty | Recruiter }> {
@@ -121,6 +278,15 @@ export const api = {
   },
   async getCollegeById(id: string): Promise<College | undefined> {
     return request(`/compat/colleges/${id}`);
+  },
+  async updateCollege(id: string, data: Partial<College>): Promise<College> {
+    return request(`/compat/colleges/${id}`, { method: 'PUT', body: data });
+  },
+  async incrementCollegeField(id: string, field?: string, amount?: number, action?: string, value?: string): Promise<College> {
+    return request(`/compat/colleges/${id}/increment`, {
+      method: 'POST',
+      body: { field, amount, action, value },
+    });
   },
 
   // Students
@@ -439,6 +605,20 @@ export const api = {
     return request(`/compat/faculty/${id}`);
   },
 
+  // Recruiters
+  async getRecruiterById(id: string): Promise<Recruiter | undefined> {
+    return request(`/compat/recruiters/${id}`);
+  },
+  async updateRecruiter(id: string, data: Partial<Recruiter>): Promise<Recruiter> {
+    return request(`/compat/recruiters/${id}`, { method: 'PUT', body: data });
+  },
+  async incrementRecruiterField(id: string, field?: string, amount?: number, action?: string, value?: string): Promise<Recruiter> {
+    return request(`/compat/recruiters/${id}/increment`, {
+      method: 'POST',
+      body: { field, amount, action, value },
+    });
+  },
+
   // Analytics
   async getCollegeAnalytics(collegeId: string) {
     return request(`/compat/analytics?collegeId=${encodeURIComponent(collegeId)}`);
@@ -450,14 +630,38 @@ export const api = {
   },
 
   // --- Signup ---
-  async signup(data: { email: string; password: string; role: 'student' | 'faculty' | 'recruiter'; name: string; collegeId?: string; department?: string; company?: string; position?: string }) {
+  async signup(data: {
+    email: string;
+    password: string;
+    role: 'student' | 'faculty' | 'recruiter';
+    name: string;
+    collegeId?: string;
+    collegeName?: string;
+    collegeLocation?: string;
+    department?: string;
+    company?: string;
+    position?: string;
+    companyDescription?: string;
+    location?: string;
+    phone?: string;
+  }) {
     // 1. Create Firebase Auth user
     const cred = await createUserWithEmailAndPassword(auth, data.email, data.password);
     // 2. Create backend profile + roleOverrides
     const { password, ...profileData } = data;
     await request('/compat/signup', { method: 'POST', body: profileData });
     // 3. Bootstrap session
-    return request('/auth/bootstrap', { method: 'POST' });
+    const bootstrap = await request<{ uid: string; role: string }>(
+      '/auth/bootstrap',
+      { method: 'POST', auth: true }
+    ).catch(() => ({ uid: cred.user.uid, role: data.role }));
+    const profile = await getProfileByEmail(data.email, data.role).catch(() => null);
+    return {
+      role: data.role,
+      userId: cred.user.uid,
+      token: await cred.user.getIdToken(),
+      user: profile || { id: cred.user.uid, email: data.email, name: data.name, role: data.role },
+    };
   },
 
   // --- AI Resume ---

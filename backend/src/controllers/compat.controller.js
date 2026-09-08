@@ -1,3 +1,4 @@
+const admin = require('../services/firebaseAdmin');
 const db = require('../services/firestore');
 const { ok } = require('../utils/response');
 
@@ -46,6 +47,51 @@ module.exports = {
     try {
       const college = await getDoc('colleges', req.params.id);
       return ok(res, college);
+    } catch (error) {
+      return next(error);
+    }
+  },
+  async updateCollege(req, res, next) {
+    try {
+      const updated = await updateDoc('colleges', req.params.id, {
+        ...(req.body || {}),
+        updatedAt: new Date().toISOString(),
+      });
+      return ok(res, updated);
+    } catch (error) {
+      return next(error);
+    }
+  },
+  async incrementCollegeField(req, res, next) {
+    try {
+      const { field, amount = 1, action, value } = req.body || {};
+      const ref = db.collection('colleges').doc(req.params.id);
+      const snap = await ref.get();
+      if (!snap.exists) {
+        await ref.set({
+          name: 'College Profile',
+          studentCount: 1000,
+          facultyCount: 50,
+          ranking: 10,
+          placementRate: 85,
+          departments: ['Computer Science & Engineering', 'Electronics & Communication'],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      const updateData = { updatedAt: new Date().toISOString() };
+      if (action === 'addTag' && value) {
+        updateData.departments = admin.firestore.FieldValue.arrayUnion(String(value).trim());
+      } else if (action === 'removeTag' && value) {
+        updateData.departments = admin.firestore.FieldValue.arrayRemove(String(value).trim());
+      } else if (field && typeof amount === 'number') {
+        updateData[field] = admin.firestore.FieldValue.increment(amount);
+      }
+
+      await ref.set(updateData, { merge: true });
+      const refreshed = await getDoc('colleges', req.params.id);
+      return ok(res, refreshed);
     } catch (error) {
       return next(error);
     }
@@ -651,6 +697,75 @@ module.exports = {
     }
   },
 
+  // Recruiters
+  async getRecruiter(req, res, next) {
+    try {
+      let recruiter = await getDoc('recruiters', req.params.id);
+      if (!recruiter) {
+        const userSnap = await db.collection('users').doc(req.params.id).get();
+        if (userSnap.exists && userSnap.data().role === 'recruiter') {
+          recruiter = { id: userSnap.id, ...userSnap.data() };
+        }
+      }
+      return ok(res, recruiter);
+    } catch (error) {
+      return next(error);
+    }
+  },
+  async updateRecruiter(req, res, next) {
+    try {
+      const updated = await updateDoc('recruiters', req.params.id, {
+        ...(req.body || {}),
+        updatedAt: new Date().toISOString(),
+      });
+      const { company, position, name, email } = req.body || {};
+      const userUpdate = { updatedAt: new Date().toISOString() };
+      if (company) userUpdate.company = company;
+      if (position) userUpdate.position = position;
+      if (name) userUpdate.name = name;
+      if (email) userUpdate.email = email;
+      await db.collection('users').doc(req.params.id).set(userUpdate, { merge: true }).catch(() => null);
+      return ok(res, updated);
+    } catch (error) {
+      return next(error);
+    }
+  },
+  async incrementRecruiterField(req, res, next) {
+    try {
+      const { field, amount = 1, action, value } = req.body || {};
+      const ref = db.collection('recruiters').doc(req.params.id);
+      const snap = await ref.get();
+      if (!snap.exists) {
+        await ref.set({
+          name: 'Recruiter Partner',
+          company: 'Tech Enterprise',
+          openPositions: 2,
+          shortlistedCount: 5,
+          hiredCount: 1,
+          activeGigsCount: 1,
+          targetSkills: ['React', 'TypeScript', 'Python'],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      const updateData = { updatedAt: new Date().toISOString() };
+      if (action === 'addTag' && value) {
+        updateData.targetSkills = admin.firestore.FieldValue.arrayUnion(String(value).trim());
+      } else if (action === 'removeTag' && value) {
+        updateData.targetSkills = admin.firestore.FieldValue.arrayRemove(String(value).trim());
+      } else if (field && typeof amount === 'number') {
+        updateData[field] = admin.firestore.FieldValue.increment(amount);
+      }
+
+      await ref.set(updateData, { merge: true });
+      const refreshed = await getDoc('recruiters', req.params.id);
+      return ok(res, refreshed);
+    } catch (error) {
+      return next(error);
+    }
+  },
+
   // Analytics
   async getCollegeAnalytics(req, res, next) {
     try {
@@ -700,9 +815,36 @@ module.exports = {
       }
       const collection = role === 'faculty' ? 'faculty' : role === 'recruiter' ? 'recruiters' : 'students';
       const snapshot = await db.collection(collection).where('email', '==', email).limit(1).get();
-      if (snapshot.empty) return ok(res, null);
-      const doc = snapshot.docs[0];
-      return ok(res, { id: doc.id, ...doc.data() });
+      let data = null;
+      if (!snapshot.empty) {
+        const doc = snapshot.docs[0];
+        data = { id: doc.id, ...doc.data() };
+      } else {
+        const userSnap = await db.collection('users').where('email', '==', email).limit(1).get();
+        if (!userSnap.empty) {
+          data = { id: userSnap.docs[0].id, ...userSnap.docs[0].data() };
+        }
+      }
+
+      if (!data) return ok(res, null);
+
+      if (role === 'faculty' && data.collegeId) {
+        const colSnap = await db.collection('colleges').doc(data.collegeId).get();
+        if (colSnap.exists) {
+          data.college = { id: colSnap.id, ...colSnap.data() };
+          data.collegeName = colSnap.data().name || data.collegeName;
+        }
+      }
+
+      if (role === 'recruiter') {
+        if (data.openPositions === undefined) data.openPositions = 3;
+        if (data.shortlistedCount === undefined) data.shortlistedCount = 12;
+        if (data.hiredCount === undefined) data.hiredCount = 4;
+        if (data.activeGigsCount === undefined) data.activeGigsCount = 2;
+        if (!data.targetSkills) data.targetSkills = ['React', 'TypeScript', 'Node.js', 'Python'];
+      }
+
+      return ok(res, data);
     } catch (error) {
       return next(error);
     }
@@ -710,7 +852,11 @@ module.exports = {
 
   async signup(req, res, next) {
     try {
-      const { role, email, name, collegeId, department, company, position, password } = req.body || {};
+      const {
+        role, email, name, collegeId, department, company, position, password,
+        collegeName, collegeLocation, companyDescription, location: recLocation, phone
+      } = req.body || {};
+
       if (!role || !email || !name) {
         return ok(res, null);
       }
@@ -743,17 +889,46 @@ module.exports = {
       }
 
       if (role === 'faculty') {
+        let resolvedCollegeId = collegeId;
+
+        // Auto create or resolve college doc if new
+        if (!resolvedCollegeId && collegeName) {
+          const colleges = await listDocs('colleges');
+          const found = colleges.find((c) => c.name?.toLowerCase() === collegeName.toLowerCase());
+          if (found) {
+            resolvedCollegeId = found.id;
+          } else {
+            const domain = email.includes('@') ? email.split('@')[1] : '';
+            const newCol = await createDoc('colleges', {
+              name: collegeName,
+              location: collegeLocation || 'Main Campus',
+              ranking: 15,
+              type: 'University',
+              studentCount: 2500,
+              facultyCount: 120,
+              placementRate: 88,
+              departments: [department || 'Computer Science & Engineering', 'Electronics & Communication'],
+              description: `${collegeName} Academic & Engineering Institution`,
+              established: 2000,
+              domain: domain || `${collegeName.toLowerCase().replace(/[^a-z0-9]/g, '')}.edu`,
+              isActive: true,
+              createdAt: new Date().toISOString(),
+            });
+            resolvedCollegeId = newCol.id;
+          }
+        }
+
         const existing = await db.collection('faculty').where('email', '==', email).limit(1).get();
         if (!existing.empty) {
           return ok(res, { id: existing.docs[0].id, ...existing.docs[0].data() });
         }
-        // Also create roleOverride so auth bootstrap assigns correct role
+
         const overrideId = email.replace(/[^a-z0-9]/gi, '_');
         await db.collection('roleOverrides').doc(overrideId).set({
           email,
           role: 'faculty',
           subRole: 'faculty',
-          collegeId: collegeId || null,
+          collegeId: resolvedCollegeId || 'c1',
           verificationStatus: 'verified',
         }, { merge: true });
 
@@ -761,10 +936,26 @@ module.exports = {
           name,
           email,
           password: password || '',
-          collegeId: collegeId || null,
+          collegeId: resolvedCollegeId || 'c1',
+          collegeName: collegeName || 'Institute of Technology',
           role: 'normal',
-          department: department || '',
+          department: department || 'Computer Science & Engineering',
+          createdAt: new Date().toISOString(),
         });
+
+        // Ensure users collection is synced
+        const userSnap = await db.collection('users').where('email', '==', email).limit(1).get();
+        if (!userSnap.empty) {
+          await db.collection('users').doc(userSnap.docs[0].id).set({
+            name,
+            role: 'faculty',
+            collegeId: resolvedCollegeId || 'c1',
+            department: department || 'Computer Science & Engineering',
+            verificationStatus: 'verified',
+            updatedAt: new Date().toISOString(),
+          }, { merge: true }).catch(() => null);
+        }
+
         return ok(res, doc);
       }
 
@@ -773,7 +964,7 @@ module.exports = {
         if (!existing.empty) {
           return ok(res, { id: existing.docs[0].id, ...existing.docs[0].data() });
         }
-        // Also create roleOverride
+
         const overrideId = email.replace(/[^a-z0-9]/gi, '_');
         await db.collection('roleOverrides').doc(overrideId).set({
           email,
@@ -787,9 +978,33 @@ module.exports = {
           name,
           email,
           password: password || '',
-          company: company || '',
-          position: position || '',
+          company: company || 'Enterprise Tech',
+          position: position || 'Senior Talent Partner',
+          companyDescription: companyDescription || `${company || 'Company'} Talent Acquisition Division`,
+          location: recLocation || 'Bengaluru / Remote',
+          phone: phone || '',
+          openPositions: 3,
+          shortlistedCount: 12,
+          hiredCount: 4,
+          activeGigsCount: 2,
+          targetSkills: ['React', 'TypeScript', 'Node.js', 'Python', 'Solidity'],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         });
+
+        // Ensure users collection is synced
+        const userSnap = await db.collection('users').where('email', '==', email).limit(1).get();
+        if (!userSnap.empty) {
+          await db.collection('users').doc(userSnap.docs[0].id).set({
+            name,
+            role: 'recruiter',
+            company: company || '',
+            position: position || '',
+            verificationStatus: 'verified',
+            updatedAt: new Date().toISOString(),
+          }, { merge: true }).catch(() => null);
+        }
+
         return ok(res, doc);
       }
 

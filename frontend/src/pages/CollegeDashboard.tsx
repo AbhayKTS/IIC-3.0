@@ -66,11 +66,11 @@ export default function CollegeDashboard() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <Button onClick={() => navigate('/college/verification')} className="gap-2 shadow-sm">
-                <ShieldCheck className="h-4 w-4" /> Verification Queue ({pendingCount})
+              <Button onClick={() => navigate('/college/profile')} className="gap-2 shadow-sm bg-primary text-primary-foreground">
+                <Building className="h-4 w-4" /> Manage College Profile
               </Button>
-              <Button variant="outline" onClick={() => navigate('/college/analytics')} className="gap-2">
-                <BarChart3 className="h-4 w-4" /> Skill Gap Radar
+              <Button variant="outline" onClick={() => navigate('/college/verification')} className="gap-2">
+                <ShieldCheck className="h-4 w-4" /> Verification Queue ({pendingCount})
               </Button>
             </div>
           </div>

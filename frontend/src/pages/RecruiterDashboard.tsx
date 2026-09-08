@@ -44,8 +44,11 @@ export default function RecruiterDashboard() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <Button onClick={() => navigate('/recruiter/search')} className="gap-2 shadow-sm">
-                <Search className="h-4 w-4" /> Discover Verified Talent
+              <Button onClick={() => navigate('/recruiter/profile')} className="gap-2 shadow-sm bg-primary text-primary-foreground">
+                <Briefcase className="h-4 w-4" /> Company Profile
+              </Button>
+              <Button variant="outline" onClick={() => navigate('/recruiter/search')} className="gap-2">
+                <Search className="h-4 w-4" /> Discover Talent
               </Button>
               <Button variant="outline" onClick={() => navigate('/recruiter/microgigs')} className="gap-2">
                 <Zap className="h-4 w-4" /> Post Micro-Gig

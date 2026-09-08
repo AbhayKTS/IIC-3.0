@@ -5,6 +5,13 @@ export interface College {
   id: string; name: string; location: string; ranking: number;
   type: string; studentCount: number; departments: string[];
   description: string; established: number;
+  domain?: string;
+  contactEmail?: string;
+  website?: string;
+  facultyCount?: number;
+  placementRate?: number;
+  isActive?: boolean;
+  updatedAt?: string;
 }
 
 export interface Institution {
@@ -79,13 +86,28 @@ export interface Student {
 }
 
 export interface Faculty {
-  id: string; name: string; email: string; password: string;
+  id: string; name: string; email: string; password?: string;
   collegeId: string; role: 'admin' | 'normal'; department: string;
+  collegeName?: string;
+  college?: College;
+  designation?: string;
+  phone?: string;
 }
 
 export interface Recruiter {
-  id: string; name: string; email: string; password: string;
+  id: string; name: string; email: string; password?: string;
   company: string; position: string;
+  companyDescription?: string;
+  location?: string;
+  website?: string;
+  phone?: string;
+  avatar?: string;
+  openPositions?: number;
+  activeGigsCount?: number;
+  shortlistedCount?: number;
+  hiredCount?: number;
+  targetSkills?: string[];
+  updatedAt?: string;
 }
 
 export interface Gig {

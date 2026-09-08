@@ -9,11 +9,27 @@ interface AuthState {
   session: (Session & { user?: Student | Faculty | Recruiter }) | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginDemo: (demoEmail: string) => Promise<void>;
   loginWithGoogle: (role?: 'student' | 'faculty' | 'recruiter') => Promise<void>;
-  signup: (data: { email: string; password: string; role: 'student' | 'faculty' | 'recruiter'; name: string; collegeId?: string; department?: string; company?: string; position?: string }) => Promise<void>;
+  signup: (data: {
+    email: string;
+    password: string;
+    role: 'student' | 'faculty' | 'recruiter';
+    name: string;
+    collegeId?: string;
+    collegeName?: string;
+    collegeLocation?: string;
+    department?: string;
+    company?: string;
+    position?: string;
+    companyDescription?: string;
+    location?: string;
+    phone?: string;
+  }) => Promise<void>;
   logout: () => void;
   isVerified: () => boolean;
   refreshUser: () => Promise<void>;
+  updateUserInSession: (updatedUserData: Partial<any>) => void;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -60,6 +76,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const loginDemo = useCallback(async (demoEmail: string) => {
+    setLoading(true);
+    try {
+      const result = await api.loginDemo(demoEmail);
+      const sess = { role: result.role, userId: result.userId, token: result.token, user: result.user };
+      localStorage.setItem('cv_session', JSON.stringify(sess));
+      setSession(sess);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const loginWithGoogle = useCallback(async (role: 'student' | 'faculty' | 'recruiter' = 'student') => {
     setLoading(true);
     try {
@@ -72,7 +100,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const signup = useCallback(async (data: { email: string; password: string; role: 'student' | 'faculty' | 'recruiter'; name: string; collegeId?: string; department?: string; company?: string; position?: string }) => {
+  const signup = useCallback(async (data: {
+    email: string;
+    password: string;
+    role: 'student' | 'faculty' | 'recruiter';
+    name: string;
+    collegeId?: string;
+    collegeName?: string;
+    collegeLocation?: string;
+    department?: string;
+    company?: string;
+    position?: string;
+    companyDescription?: string;
+    location?: string;
+    phone?: string;
+  }) => {
     setLoading(true);
     try {
       const result = await api.signup(data) as any;
@@ -95,20 +137,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return (session.user as Student)?.verificationStatus === 'verified';
   }, [session]);
 
+  const updateUserInSession = useCallback((updatedUserData: Partial<any>) => {
+    setSession((prev) => {
+      if (!prev) return prev;
+      const updated = {
+        ...prev,
+        user: {
+          ...(prev.user || {}),
+          ...updatedUserData,
+        },
+      };
+      localStorage.setItem('cv_session', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
   const refreshUser = useCallback(async () => {
     if (!session) return;
-    if (session.role === 'student') {
-      const user = await api.getStudentById(session.userId);
-      if (user) {
-        const updated = { ...session, user };
-        localStorage.setItem('cv_session', JSON.stringify(updated));
-        setSession(updated);
+    try {
+      if (session.role === 'student') {
+        const user = await api.getStudentById(session.userId);
+        if (user) {
+          updateUserInSession(user);
+        }
+      } else if (session.role === 'faculty') {
+        const user = await api.getFacultyById(session.userId);
+        if (user) {
+          updateUserInSession(user);
+        }
+      } else if (session.role === 'recruiter') {
+        const user = await api.getRecruiterById(session.userId);
+        if (user) {
+          updateUserInSession(user);
+        }
       }
+    } catch (e) {
+      console.warn('refreshUser error:', e);
     }
-  }, [session]);
+  }, [session, updateUserInSession]);
 
   return (
-    <AuthContext.Provider value={{ session, loading, login, loginWithGoogle, signup, logout, isVerified, refreshUser }}>
+    <AuthContext.Provider value={{ session, loading, login, loginDemo, loginWithGoogle, signup, logout, isVerified, refreshUser, updateUserInSession }}>
       {children}
     </AuthContext.Provider>
   );

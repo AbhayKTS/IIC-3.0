@@ -6,6 +6,8 @@ const router = express.Router();
 // Colleges
 router.get('/colleges', compat.listColleges);
 router.get('/colleges/:id', compat.getCollege);
+router.put('/colleges/:id', compat.updateCollege);
+router.post('/colleges/:id/increment', compat.incrementCollegeField);
 
 // Students
 router.get('/students', compat.listStudents);
@@ -92,6 +94,11 @@ router.patch('/shortlist', compat.updateShortlist);
 
 // Faculty
 router.get('/faculty/:id', compat.getFaculty);
+
+// Recruiters
+router.get('/recruiters/:id', compat.getRecruiter);
+router.put('/recruiters/:id', compat.updateRecruiter);
+router.post('/recruiters/:id/increment', compat.incrementRecruiterField);
 
 // Analytics
 router.get('/analytics', compat.getCollegeAnalytics);

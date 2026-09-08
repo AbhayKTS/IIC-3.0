@@ -2,15 +2,50 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { motion } from 'framer-motion';
-import { Briefcase, AlertCircle, ShieldCheck } from 'lucide-react';
+import { Briefcase, AlertCircle, ShieldCheck, Mail, Lock, ArrowRight, Sparkles } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
 import AuthIllustration from '@/components/AuthIllustration';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 export default function LoginRecruiter() {
-  const { loginWithGoogle, loading } = useAuth();
+  const { login, loginDemo, loginWithGoogle, loading } = useAuth();
   const navigate = useNavigate();
+
+  const [email, setEmail] = useState('vikram@techcorp.com');
+  const [password, setPassword] = useState('pass123');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 1-Click Instant Demo Login
+  const handleQuickDemoLogin = async (demoEmail: string, companyName: string) => {
+    setError('');
+    setIsSubmitting(true);
+    try {
+      await loginDemo(demoEmail);
+      toast.success(`Logged in as Demo Recruiter (${companyName})!`);
+      navigate('/recruiter/dashboard');
+    } catch (err: any) {
+      setError(err?.message || 'Demo login failed');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleManualLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsSubmitting(true);
+    try {
+      await login(email, password);
+      setIsSubmitting(false);
+      navigate('/recruiter/dashboard');
+    } catch (err: any) {
+      setIsSubmitting(false);
+      setError(err?.message || 'Corporate recruiter login failed. Please verify credentials or click a demo account below.');
+    }
+  };
 
   const handleGoogleLogin = async () => {
     setError('');
@@ -35,14 +70,55 @@ export default function LoginRecruiter() {
             animate={{ opacity: 1, y: 0 }}
             className="order-2 lg:order-1 w-full max-w-md mx-auto lg:mx-0"
           >
-            <div className="bg-card border border-border rounded-2xl p-8 shadow-sm space-y-6">
+            <div className="bg-card border border-border rounded-2xl p-8 shadow-sm space-y-5">
               <div className="text-center">
                 <Briefcase className="h-10 w-10 text-cyan mx-auto mb-3" />
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-cyan/10 text-cyan">
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-cyan/10 text-cyan font-mono">
                   Recruiter Portal
                 </span>
                 <h1 className="text-2xl font-bold text-foreground mt-2">Recruiter Sign In</h1>
                 <p className="text-sm text-muted-foreground mt-1">Discover and hire verified talent across universities</p>
+              </div>
+
+              {/* 1-Click Instant Demo Login Banner */}
+              <div className="p-4 rounded-xl bg-gradient-to-r from-cyan/15 via-indigo-500/10 to-transparent border border-cyan/30 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-cyan flex items-center gap-1.5 font-mono">
+                    <Sparkles className="h-3.5 w-3.5 text-cyan" />
+                    ONE-CLICK DEMO EXPLORE
+                  </span>
+                  <span className="text-[10px] text-muted-foreground font-mono bg-secondary/80 px-2 py-0.5 rounded">
+                    No password needed
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    disabled={loading || isSubmitting}
+                    onClick={() => handleQuickDemoLogin('vikram@techcorp.com', 'TechCorp')}
+                    className="p-2.5 rounded-lg border border-cyan/30 bg-cyan/10 hover:bg-cyan/20 text-left transition-all group disabled:opacity-50"
+                  >
+                    <div className="font-semibold text-xs text-foreground group-hover:text-cyan flex items-center justify-between">
+                      <span>TechCorp Talent</span>
+                      <ArrowRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    <div className="text-[10px] text-muted-foreground font-mono">Vikram Mehta</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={loading || isSubmitting}
+                    onClick={() => handleQuickDemoLogin('hiring@polygon.technology', 'Polygon Labs')}
+                    className="p-2.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 text-left transition-all group disabled:opacity-50"
+                  >
+                    <div className="font-semibold text-xs text-foreground group-hover:text-indigo-400 flex items-center justify-between">
+                      <span>Polygon Labs</span>
+                      <ArrowRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    <div className="text-[10px] text-muted-foreground font-mono">Ananya Das</div>
+                  </button>
+                </div>
               </div>
 
               {error && (
@@ -52,13 +128,71 @@ export default function LoginRecruiter() {
                 </div>
               )}
 
+              {/* Credentials Form */}
+              <form onSubmit={handleManualLogin} className="space-y-4">
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-foreground">Work Email</label>
+                    <button
+                      type="button"
+                      onClick={() => { setEmail('vikram@techcorp.com'); setPassword('pass123'); }}
+                      className="text-[10px] text-cyan hover:underline font-mono"
+                    >
+                      Fill Demo Creds
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="email"
+                      placeholder="name@company.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="pl-9 h-9 text-xs bg-secondary/20 font-mono"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-foreground">Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pl-9 h-9 text-xs bg-secondary/20"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={loading || isSubmitting}
+                  className="w-full h-10 gap-2 bg-primary text-primary-foreground font-semibold text-xs shadow-md mt-1"
+                >
+                  {isSubmitting ? 'Signing In...' : 'Sign In with Credentials'}
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </form>
+
+              {/* Divider */}
+              <div className="relative flex items-center justify-center">
+                <div className="border-t border-border w-full"></div>
+                <span className="bg-card px-3 text-[11px] text-muted-foreground uppercase font-mono">Or SSO</span>
+              </div>
+
+              {/* Google Login Option */}
               <button
                 type="button"
                 onClick={handleGoogleLogin}
                 disabled={loading || isSubmitting}
-                className="w-full py-3 px-4 rounded-xl border border-border bg-card hover:bg-secondary/50 text-foreground text-sm font-semibold transition-colors flex items-center justify-center gap-3 disabled:opacity-50 shadow-sm"
+                className="w-full py-2.5 px-4 rounded-xl border border-border bg-card hover:bg-secondary/50 text-foreground text-xs font-semibold transition-colors flex items-center justify-center gap-3 disabled:opacity-50 shadow-sm"
               >
-                <svg className="h-5 w-5" viewBox="0 0 24 24">
+                <svg className="h-4 w-4" viewBox="0 0 24 24">
                   <path
                     fill="#4285F4"
                     d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -76,24 +210,12 @@ export default function LoginRecruiter() {
                     d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                   />
                 </svg>
-                <span>{isSubmitting ? 'Authenticating with Google...' : 'Continue with Corporate Google Account'}</span>
+                <span>Continue with Corporate Google Account</span>
               </button>
 
-              <div className="p-4 rounded-xl bg-secondary/40 border border-border/60 text-xs space-y-2 text-muted-foreground">
-                <div className="font-semibold text-foreground flex items-center gap-1.5">
-                  <ShieldCheck className="h-4 w-4 text-cyan" />
-                  <span>Corporate Recruiting Network</span>
-                </div>
-                <ul className="space-y-1.5 list-disc pl-4 text-[11px] leading-relaxed">
-                  <li>Instant onboarding via corporate Google SSO.</li>
-                  <li>Filter talent by tamper-proof Polygon Soulbound Tokens (SBTs).</li>
-                  <li>Directly post bounties, micro-gigs, and internships.</li>
-                </ul>
-              </div>
-
-              <p className="text-center text-sm text-muted-foreground pt-1">
+              <p className="text-center text-xs text-muted-foreground pt-1">
                 New company recruiter?{' '}
-                <Link to="/signup/recruiter" className="text-primary hover:underline font-medium">
+                <Link to="/signup/recruiter" className="text-primary hover:underline font-semibold">
                   Create recruiter account
                 </Link>
               </p>
