@@ -152,7 +152,36 @@ export default function StudentDashboard() {
   const handleIdVerified = (result: any) => {
     setIdResult(result);
     const status = result?.status;
-    if (status === 'VERIFIED') {
+    const isVerifiedNow = status === 'VERIFIED' || status === 'verified';
+
+    // Immediately update local overview state so all badges and banners flip to VERIFIED instantly
+    setOverview((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        verificationStatus: isVerifiedNow ? 'verified' : (status === 'REQUIRES_REVIEW' ? 'pending' : prev.verificationStatus),
+        idVerification: result,
+        profileCompletion: isVerifiedNow ? Math.min(100, Math.max(prev.profileCompletion || 0, 75)) : prev.profileCompletion,
+        missingFields: isVerifiedNow
+          ? (prev.missingFields || []).filter((f) => !f.toLowerCase().includes('college id'))
+          : prev.missingFields,
+      };
+    });
+
+    // Update session user in localStorage so refreshing persists verified status
+    try {
+      const sessStr = localStorage.getItem('cv_session');
+      if (sessStr) {
+        const sess = JSON.parse(sessStr);
+        if (sess.user) {
+          sess.user.verificationStatus = isVerifiedNow ? 'verified' : sess.user.verificationStatus;
+          sess.user.idVerification = result;
+          localStorage.setItem('cv_session', JSON.stringify(sess));
+        }
+      }
+    } catch {}
+
+    if (isVerifiedNow) {
       toast.success('Identity verified! Your college ID has been successfully validated.');
     } else if (status === 'REQUIRES_REVIEW') {
       toast('ID submitted for faculty review. You will be notified once reviewed.', { icon: '⏳' });
@@ -161,7 +190,8 @@ export default function StudentDashboard() {
     } else {
       toast('ID card processed.');
     }
-    // Refresh dashboard data in background
+
+    refreshUser().catch(() => null);
     fetchDashboardData().catch(() => null);
   };
 
@@ -202,10 +232,31 @@ export default function StudentDashboard() {
     }
   };
 
+  const effectiveIdVerification = idResult || overview?.idVerification;
+
+  const isIdVerified =
+    effectiveIdVerification?.status === 'VERIFIED' ||
+    effectiveIdVerification?.status === 'verified' ||
+    overview?.verificationStatus === 'verified';
+
+  const isIdPending =
+    !isIdVerified &&
+    (effectiveIdVerification?.status === 'REQUIRES_REVIEW' ||
+      effectiveIdVerification?.status === 'pending_review' ||
+      overview?.verificationStatus === 'pending');
+
+  const verificationStatus: 'verified' | 'pending' | 'rejected' | 'unverified' =
+    isIdVerified
+      ? 'verified'
+      : isIdPending
+        ? 'pending'
+        : overview?.verificationStatus === 'rejected' || effectiveIdVerification?.status === 'FAILED'
+          ? 'rejected'
+          : 'unverified';
+
   const studentName = overview?.user?.name || overview?.profile?.name || session?.user?.name || 'Student';
   const studentEmail = overview?.user?.email || session?.user?.email || '';
   const collegeName = overview?.college?.name || 'Registered Institution';
-  const verificationStatus = overview?.verificationStatus || 'unverified';
   const profileCompletion = overview?.profileCompletion ?? 0;
   const missingFields = overview?.missingFields || [];
   const skillsList = overview?.skills || [];
@@ -345,7 +396,10 @@ export default function StudentDashboard() {
                     <h3 className="font-semibold text-foreground text-base flex items-center gap-2">
                       <ShieldCheck className="h-5 w-5 text-primary" /> College Verification
                     </h3>
-                    <Badge variant={verificationStatus === 'verified' ? 'default' : 'secondary'}>
+                    <Badge
+                      variant={isIdVerified ? 'default' : 'secondary'}
+                      className={isIdVerified ? 'bg-emerald-500 text-white' : ''}
+                    >
                       {verificationStatus.toUpperCase()}
                     </Badge>
                   </div>
@@ -356,15 +410,15 @@ export default function StudentDashboard() {
                       <span>College email verified ({studentEmail})</span>
                     </li>
                     <li className="flex items-center gap-2">
-                      {overview?.idVerification?.status === 'verified' ? (
+                      {isIdVerified ? (
                         <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                      ) : overview?.idVerification?.status === 'pending_review' ? (
+                      ) : isIdPending ? (
                         <Clock className="h-4 w-4 text-amber-500" />
                       ) : (
                         <AlertCircle className="h-4 w-4 text-muted-foreground" />
                       )}
                       <span>
-                        College ID card: {overview?.idVerification ? overview.idVerification.status.replace('_', ' ') : 'Not Submitted'}
+                        College ID card: {effectiveIdVerification ? ((effectiveIdVerification.status || '').replace('_', ' ') || 'Submitted') : 'Not Submitted'}
                       </span>
                     </li>
                     <li className="flex items-center gap-2">
@@ -382,7 +436,7 @@ export default function StudentDashboard() {
                   >
                     <span className="flex items-center gap-2">
                       <Camera className="h-4 w-4" />
-                      {overview?.idVerification ? 'Rescan College ID' : 'Scan College ID'}
+                      {effectiveIdVerification ? 'Rescan College ID' : 'Scan College ID'}
                     </span>
                     <ChevronRight className="h-4 w-4" />
                   </Button>
@@ -514,43 +568,43 @@ export default function StudentDashboard() {
                   <h3 className="font-semibold text-foreground text-base flex items-center gap-2">
                     <UserCheck className="h-5 w-5 text-primary" /> College ID Verification
                   </h3>
-                  {overview?.idVerification?.status && (
+                  {effectiveIdVerification?.status && (
                     <Badge
                       variant="outline"
                       className={`text-xs ${
-                        overview.idVerification.status === 'VERIFIED'
+                        isIdVerified
                           ? 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400'
-                          : overview.idVerification.status === 'REQUIRES_REVIEW'
+                          : effectiveIdVerification.status === 'REQUIRES_REVIEW'
                           ? 'border-amber-500/40 text-amber-600 dark:text-amber-400'
-                          : overview.idVerification.status === 'FAILED'
+                          : effectiveIdVerification.status === 'FAILED'
                           ? 'border-destructive/40 text-destructive'
                           : ''
                       }`}
                     >
-                      {overview.idVerification.status.replace('_', ' ')}
+                      {(effectiveIdVerification.status || '').replace('_', ' ')}
                     </Badge>
                   )}
                 </div>
 
-                {overview?.idVerification ? (
+                {effectiveIdVerification ? (
                   <div className="space-y-3">
                     {/* Status Banner */}
-                    {overview.idVerification.status === 'VERIFIED' && (
+                    {isIdVerified && (
                       <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs flex items-center gap-2">
                         <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
                         <span>Identity verified: institution, name, and enrollment matched.</span>
                       </div>
                     )}
-                    {overview.idVerification.status === 'REQUIRES_REVIEW' && (
+                    {effectiveIdVerification.status === 'REQUIRES_REVIEW' && (
                       <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs flex items-center gap-2">
                         <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                        <span>{overview.idVerification.reasonMessage || 'Submitted for faculty review.'}</span>
+                        <span>{effectiveIdVerification.reasonMessage || 'Submitted for faculty review.'}</span>
                       </div>
                     )}
-                    {overview.idVerification.status === 'FAILED' && (
+                    {effectiveIdVerification.status === 'FAILED' && (
                       <div className="p-2.5 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs flex items-center gap-2">
                         <XCircle className="h-4 w-4 flex-shrink-0" />
-                        <span>{overview.idVerification.reasonMessage || 'Verification failed. Please try again.'}</span>
+                        <span>{effectiveIdVerification.reasonMessage || 'Verification failed. Please try again.'}</span>
                       </div>
                     )}
 
@@ -559,25 +613,25 @@ export default function StudentDashboard() {
                       <div>
                         <span className="text-muted-foreground block">Extracted Name</span>
                         <span className="font-medium text-foreground">
-                          {overview.idVerification.extractedData?.studentName || 'Not detected'}
+                          {effectiveIdVerification.extractedData?.studentName || studentName}
                         </span>
                       </div>
                       <div>
                         <span className="text-muted-foreground block">Roll / Enrollment #</span>
                         <span className="font-medium text-foreground">
-                          {overview.idVerification.extractedData?.rollNumber || 'Not detected'}
+                          {effectiveIdVerification.extractedData?.rollNumber || 'Not detected'}
                         </span>
                       </div>
                       <div>
                         <span className="text-muted-foreground block">Extracted Institution</span>
                         <span className="font-medium text-foreground">
-                          {overview.idVerification.extractedData?.collegeName || 'Not detected'}
+                          {effectiveIdVerification.extractedData?.collegeName || collegeName}
                         </span>
                       </div>
                       <div>
                         <span className="text-muted-foreground block">Validity</span>
                         <span className="font-medium text-foreground">
-                          {overview.idVerification.extractedData?.validUntil || 'Active'}
+                          {effectiveIdVerification.extractedData?.validUntil || 'Active'}
                         </span>
                       </div>
                     </div>
