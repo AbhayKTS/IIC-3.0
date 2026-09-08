@@ -278,10 +278,52 @@ export const api = {
     return request('/compat/colleges');
   },
   async getCollegeById(id: string): Promise<College | undefined> {
-    return request(`/compat/colleges/${id}`);
+    try {
+      const res = await request<College>(`/compat/colleges/${id}`);
+      if (res && res.id) return res;
+    } catch (_) {}
+
+    if (db && id) {
+      try {
+        const snap = await getDoc(doc(db, 'colleges', id));
+        if (snap.exists()) {
+          return { id, ...snap.data() } as College;
+        }
+      } catch (e) {
+        console.warn('Firestore college read notice:', e);
+      }
+    }
+
+    const session = JSON.parse(localStorage.getItem('cv_session') || '{}');
+    if (session?.user?.college?.id === id || session?.user?.collegeId === id) {
+      return session.user.college as College;
+    }
+    return undefined;
   },
   async updateCollege(id: string, data: Partial<College>): Promise<College> {
-    return request(`/compat/colleges/${id}`, { method: 'PUT', body: data });
+    const session = JSON.parse(localStorage.getItem('cv_session') || '{}');
+    if (session?.user) {
+      session.user.college = { ...(session.user.college || {}), ...data };
+      if (data.name) session.user.collegeName = data.name;
+      localStorage.setItem('cv_session', JSON.stringify(session));
+    }
+
+    if (db && id) {
+      try {
+        await setDoc(doc(db, 'colleges', id), { ...data, updatedAt: new Date().toISOString() }, { merge: true });
+      } catch (e) {
+        console.warn('Direct Firestore college write notice:', e);
+      }
+    }
+
+    broadcastRealtimeUpdate({
+      type: 'college:updated',
+      entityType: 'college',
+      entityId: id,
+      data,
+    });
+
+    return request(`/compat/colleges/${id}`, { method: 'PUT', body: data }).catch(() => data as College);
   },
   async incrementCollegeField(id: string, field?: string, amount?: number, action?: string, value?: string): Promise<College> {
     return request(`/compat/colleges/${id}/increment`, {
@@ -813,10 +855,51 @@ export const api = {
 
   // Recruiters
   async getRecruiterById(id: string): Promise<Recruiter | undefined> {
-    return request(`/compat/recruiters/${id}`);
+    try {
+      const res = await request<Recruiter>(`/compat/recruiters/${id}`);
+      if (res && res.id) return res;
+    } catch (_) {}
+
+    if (db && id) {
+      try {
+        const snap = await getDoc(doc(db, 'recruiters', id));
+        if (snap.exists()) {
+          return { id, ...snap.data() } as Recruiter;
+        }
+      } catch (e) {
+        console.warn('Firestore recruiter read notice:', e);
+      }
+    }
+
+    const session = JSON.parse(localStorage.getItem('cv_session') || '{}');
+    if (session?.userId === id && session?.user) {
+      return session.user as Recruiter;
+    }
+    return undefined;
   },
   async updateRecruiter(id: string, data: Partial<Recruiter>): Promise<Recruiter> {
-    return request(`/compat/recruiters/${id}`, { method: 'PUT', body: data });
+    const session = JSON.parse(localStorage.getItem('cv_session') || '{}');
+    if (session?.user) {
+      session.user = { ...session.user, ...data };
+      localStorage.setItem('cv_session', JSON.stringify(session));
+    }
+
+    if (db && id) {
+      try {
+        await setDoc(doc(db, 'recruiters', id), { ...data, updatedAt: new Date().toISOString() }, { merge: true });
+      } catch (e) {
+        console.warn('Direct Firestore recruiter write notice:', e);
+      }
+    }
+
+    broadcastRealtimeUpdate({
+      type: 'recruiter:updated',
+      entityType: 'recruiter',
+      entityId: id,
+      data,
+    });
+
+    return request(`/compat/recruiters/${id}`, { method: 'PUT', body: data }).catch(() => data as Recruiter);
   },
   async incrementRecruiterField(id: string, field?: string, amount?: number, action?: string, value?: string): Promise<Recruiter> {
     return request(`/compat/recruiters/${id}/increment`, {

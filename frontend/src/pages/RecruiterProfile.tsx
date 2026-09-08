@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRealtimeSync } from '@/lib/realtimeSync';
+import { useRealtimeStudents } from '@/lib/useRealtimeStudents';
 import RealtimeStudentRoster from '@/components/RealtimeStudentRoster';
 import {
   Briefcase,
@@ -97,6 +98,12 @@ export default function RecruiterProfile() {
     },
     pollIntervalMs: 5000,
   });
+
+  const { students: candidatePool } = useRealtimeStudents();
+  const verifiedCandidatesCount = candidatePool.filter((s) => s.verificationStatus === 'verified').length;
+  const verifiedPercentage = candidatePool.length > 0
+    ? Math.round((verifiedCandidatesCount / candidatePool.length) * 100)
+    : 0;
 
   useEffect(() => {
     setLoading(true);
@@ -263,79 +270,72 @@ export default function RecruiterProfile() {
           </div>
         </div>
 
-        {/* 4 Interactive Real-time Counter Cards with Increment & Decrement */}
+        {/* 4 Real-time Recruitment Metric Cards (Computed from Real Firestore Data) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* 1. Open Job Positions */}
+          {/* 1. Candidate Pool */}
           <motion.div
             whileHover={{ scale: 1.01 }}
             className="relative overflow-hidden glass-card p-5 rounded-2xl border border-border/80 bg-surface/60 backdrop-blur-xl flex flex-col justify-between"
           >
             <div className="flex items-center justify-between text-muted-foreground text-xs pb-1">
               <span className="font-medium text-foreground flex items-center gap-1.5">
-                <Briefcase className="h-4 w-4 text-cyan" />
-                Open Roles
+                <Users className="h-4 w-4 text-cyan" />
+                Candidate Talent Pool
               </span>
-              <span className="text-[10px] font-mono text-cyan bg-cyan/10 px-1.5 py-0.5 rounded">
-                Active Hiring
+              <span className="text-[10px] font-mono text-cyan bg-cyan/10 px-1.5 py-0.5 rounded flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Live Database
               </span>
             </div>
 
-            <div className="py-2 flex items-baseline justify-between">
+            <div className="py-2">
               <div className="text-3xl font-black text-foreground font-mono tracking-tight">
-                {recruiter.openPositions ?? 0}
+                {candidatePool.length}
               </div>
-              <AnimatePresence>
-                {counterFloatingFeedback
-                  .filter((f) => f.id.startsWith('openPositions'))
-                  .map((f) => (
-                    <motion.span
-                      key={f.id}
-                      initial={{ opacity: 0, y: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, y: -18, scale: 1.2 }}
-                      exit={{ opacity: 0 }}
-                      className={`text-sm font-bold font-mono ${f.color}`}
-                    >
-                      {f.text}
-                    </motion.span>
-                  ))}
-              </AnimatePresence>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                <span className="text-emerald-400 font-semibold">{verifiedCandidatesCount} Verified</span>
+                {' · '}
+                <span className="text-amber-400 font-semibold">{candidatePool.length - verifiedCandidatesCount} Reviewing</span>
+              </p>
             </div>
 
-            <div className="pt-2 border-t border-border/40 flex items-center justify-between gap-1.5">
-              <span className="text-[11px] text-muted-foreground">Adjust:</span>
-              <div className="flex items-center gap-1">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleCounterChange('openPositions', -1)}
-                  className="h-7 w-8 p-0 text-xs font-mono hover:border-rose-500 hover:text-rose-400"
-                  title="Decrement 1 role"
-                >
-                  <Minus className="h-3 w-3" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleCounterChange('openPositions', 1)}
-                  className="h-7 w-8 p-0 text-xs font-mono hover:border-emerald-500 hover:text-emerald-400"
-                  title="Increment 1 role"
-                >
-                  <Plus className="h-3 w-3" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleCounterChange('openPositions', 5)}
-                  className="h-7 px-2 text-xs font-mono hover:border-emerald-500 hover:text-emerald-400"
-                  title="Increment 5 roles"
-                >
-                  +5
-                </Button>
-              </div>
+            <div className="pt-2 border-t border-border/40 flex items-center justify-between text-[11px] text-muted-foreground font-mono">
+              <span>Talent Source:</span>
+              <span className="text-foreground">Real-time Firestore</span>
             </div>
           </motion.div>
 
-          {/* 2. Shortlisted Candidates */}
+          {/* 2. Verified Candidates */}
+          <motion.div
+            whileHover={{ scale: 1.01 }}
+            className="relative overflow-hidden glass-card p-5 rounded-2xl border border-border/80 bg-surface/60 backdrop-blur-xl flex flex-col justify-between"
+          >
+            <div className="flex items-center justify-between text-muted-foreground text-xs pb-1">
+              <span className="font-medium text-foreground flex items-center gap-1.5">
+                <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                Verified Candidates
+              </span>
+              <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                Placement Ready
+              </span>
+            </div>
+
+            <div className="py-2">
+              <div className="text-3xl font-black text-emerald-400 font-mono tracking-tight">
+                {verifiedCandidatesCount}
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                {verifiedPercentage}% of candidates verified via SBT & College ID
+              </p>
+            </div>
+
+            <div className="pt-2 border-t border-border/40 flex items-center justify-between text-[11px] text-muted-foreground font-mono">
+              <span>Verification:</span>
+              <span className="text-emerald-400">Official Institution OCR</span>
+            </div>
+          </motion.div>
+
+          {/* 3. Target Tech Skills */}
           <motion.div
             whileHover={{ scale: 1.01 }}
             className="relative overflow-hidden glass-card p-5 rounded-2xl border border-border/80 bg-surface/60 backdrop-blur-xl flex flex-col justify-between"
@@ -343,196 +343,55 @@ export default function RecruiterProfile() {
             <div className="flex items-center justify-between text-muted-foreground text-xs pb-1">
               <span className="font-medium text-foreground flex items-center gap-1.5">
                 <Target className="h-4 w-4 text-primary" />
-                Shortlist Target
+                Target Tech Skills
               </span>
               <span className="text-[10px] font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded">
-                Pipeline
+                Stack Filters
               </span>
             </div>
 
-            <div className="py-2 flex items-baseline justify-between">
-              <div className="text-3xl font-black text-foreground font-mono tracking-tight">
-                {recruiter.shortlistedCount ?? 0}
+            <div className="py-2">
+              <div className="text-3xl font-black text-primary font-mono tracking-tight">
+                {recruiter.targetSkills?.length ?? 0}
               </div>
-              <AnimatePresence>
-                {counterFloatingFeedback
-                  .filter((f) => f.id.startsWith('shortlistedCount'))
-                  .map((f) => (
-                    <motion.span
-                      key={f.id}
-                      initial={{ opacity: 0, y: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, y: -18, scale: 1.2 }}
-                      exit={{ opacity: 0 }}
-                      className={`text-sm font-bold font-mono ${f.color}`}
-                    >
-                      {f.text}
-                    </motion.span>
-                  ))}
-              </AnimatePresence>
+              <p className="text-[11px] text-muted-foreground mt-1 truncate">
+                {recruiter.targetSkills?.slice(0, 3).join(', ')}{(recruiter.targetSkills?.length ?? 0) > 3 ? '...' : ''}
+              </p>
             </div>
 
-            <div className="pt-2 border-t border-border/40 flex items-center justify-between gap-1.5">
-              <span className="text-[11px] text-muted-foreground">Adjust:</span>
-              <div className="flex items-center gap-1">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleCounterChange('shortlistedCount', -1)}
-                  className="h-7 w-8 p-0 text-xs font-mono hover:border-rose-500 hover:text-rose-400"
-                  title="Decrement 1"
-                >
-                  <Minus className="h-3 w-3" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleCounterChange('shortlistedCount', 1)}
-                  className="h-7 w-8 p-0 text-xs font-mono hover:border-emerald-500 hover:text-emerald-400"
-                  title="Increment 1"
-                >
-                  <Plus className="h-3 w-3" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleCounterChange('shortlistedCount', 5)}
-                  className="h-7 px-2 text-xs font-mono hover:border-emerald-500 hover:text-emerald-400"
-                  title="Increment 5"
-                >
-                  +5
-                </Button>
-              </div>
+            <div className="pt-2 border-t border-border/40 flex items-center justify-between text-[11px] text-muted-foreground font-mono">
+              <span>Matching Engine:</span>
+              <span className="text-foreground">Live Candidate Matching</span>
             </div>
           </motion.div>
 
-          {/* 3. Successful Hires */}
+          {/* 4. Open Job Positions */}
           <motion.div
             whileHover={{ scale: 1.01 }}
             className="relative overflow-hidden glass-card p-5 rounded-2xl border border-border/80 bg-surface/60 backdrop-blur-xl flex flex-col justify-between"
           >
             <div className="flex items-center justify-between text-muted-foreground text-xs pb-1">
               <span className="font-medium text-foreground flex items-center gap-1.5">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                Hires Completed
-              </span>
-              <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                Verified Offers
-              </span>
-            </div>
-
-            <div className="py-2 flex items-baseline justify-between">
-              <div className="text-3xl font-black text-emerald-400 font-mono tracking-tight">
-                {recruiter.hiredCount ?? 0}
-              </div>
-              <AnimatePresence>
-                {counterFloatingFeedback
-                  .filter((f) => f.id.startsWith('hiredCount'))
-                  .map((f) => (
-                    <motion.span
-                      key={f.id}
-                      initial={{ opacity: 0, y: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, y: -18, scale: 1.2 }}
-                      exit={{ opacity: 0 }}
-                      className={`text-sm font-bold font-mono ${f.color}`}
-                    >
-                      {f.text}
-                    </motion.span>
-                  ))}
-              </AnimatePresence>
-            </div>
-
-            <div className="pt-2 border-t border-border/40 flex items-center justify-between gap-1.5">
-              <span className="text-[11px] text-muted-foreground">Adjust:</span>
-              <div className="flex items-center gap-1">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleCounterChange('hiredCount', -1)}
-                  className="h-7 w-8 p-0 text-xs font-mono hover:border-rose-500 hover:text-rose-400"
-                  title="Decrement 1"
-                >
-                  <Minus className="h-3 w-3" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleCounterChange('hiredCount', 1)}
-                  className="h-7 w-8 p-0 text-xs font-mono hover:border-emerald-500 hover:text-emerald-400"
-                  title="Increment 1"
-                >
-                  <Plus className="h-3 w-3" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleCounterChange('hiredCount', 5)}
-                  className="h-7 px-2 text-xs font-mono hover:border-emerald-500 hover:text-emerald-400"
-                  title="Increment 5"
-                >
-                  +5
-                </Button>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* 4. Active Micro-Gigs Running */}
-          <motion.div
-            whileHover={{ scale: 1.01 }}
-            className="relative overflow-hidden glass-card p-5 rounded-2xl border border-border/80 bg-surface/60 backdrop-blur-xl flex flex-col justify-between"
-          >
-            <div className="flex items-center justify-between text-muted-foreground text-xs pb-1">
-              <span className="font-medium text-foreground flex items-center gap-1.5">
-                <Zap className="h-4 w-4 text-amber-400" />
-                Active Micro-Gigs
+                <Briefcase className="h-4 w-4 text-amber-400" />
+                Open Job Positions
               </span>
               <span className="text-[10px] font-mono text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
-                Bounties
+                Active Hiring
               </span>
             </div>
 
-            <div className="py-2 flex items-baseline justify-between">
+            <div className="py-2">
               <div className="text-3xl font-black text-amber-400 font-mono tracking-tight">
-                {recruiter.activeGigsCount ?? 0}
+                {recruiter.openPositions ?? 0}
               </div>
-              <AnimatePresence>
-                {counterFloatingFeedback
-                  .filter((f) => f.id.startsWith('activeGigsCount'))
-                  .map((f) => (
-                    <motion.span
-                      key={f.id}
-                      initial={{ opacity: 0, y: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, y: -18, scale: 1.2 }}
-                      exit={{ opacity: 0 }}
-                      className={`text-sm font-bold font-mono ${f.color}`}
-                    >
-                      {f.text}
-                    </motion.span>
-                  ))}
-              </AnimatePresence>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Active positions hiring from partner universities
+              </p>
             </div>
 
-            <div className="pt-2 border-t border-border/40 flex items-center justify-between gap-1.5">
-              <span className="text-[11px] text-muted-foreground">Adjust:</span>
-              <div className="flex items-center gap-1">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleCounterChange('activeGigsCount', -1)}
-                  className="h-7 w-8 p-0 text-xs font-mono hover:border-rose-500 hover:text-rose-400"
-                  title="Decrement 1 gig"
-                >
-                  <Minus className="h-3 w-3" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleCounterChange('activeGigsCount', 1)}
-                  className="h-7 w-8 p-0 text-xs font-mono hover:border-emerald-500 hover:text-emerald-400"
-                  title="Increment 1 gig"
-                >
-                  <Plus className="h-3 w-3" />
-                </Button>
-              </div>
+            <div className="pt-2 border-t border-border/40 flex items-center justify-between text-[11px] text-muted-foreground font-mono">
+              <span>Pipeline:</span>
+              <span className="text-foreground">{recruiter.company} Direct</span>
             </div>
           </motion.div>
         </div>
