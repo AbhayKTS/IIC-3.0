@@ -1,346 +1,360 @@
-import { Link, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useEffect, useState } from 'react';
-import {
-  GraduationCap, Search, Trophy, Zap, ShoppingBag, Users, ArrowRight,
-  Star, TrendingUp, DollarSign, BookOpen, Briefcase, Award, X
-} from 'lucide-react';
+import { ArrowRight, BadgeCheck, BriefcaseBusiness, Building2, ChevronDown, GraduationCap, ShoppingBag, Sparkles, Trophy, WalletCards, Check } from 'lucide-react';
 import { api } from '@/lib/mockApi';
-import type { College, Gig, MarketplaceItem } from '@/lib/types';
-import heroBg from '@/assets/hero-bg.jpg';
-import cvrCoin from '@/assets/cvr-coin.png';
+import type { Gig, MarketplaceItem } from '@/lib/types';
+import almadoxCoin from '@/assets/almadox-coin-warm.png';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
-import ShaderShowcase from '@/components/ui/hero';
 
-const fadeUp = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } };
+// Lovable's reveal animation
+const reveal = {
+  initial: { opacity: 0, y: 28 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, margin: "-80px" as any },
+  transition: { duration: 0.65, ease: [0.22, 1, 0.36, 1] },
+};
 
-function ContactModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const [form, setForm] = useState({ name: '', email: '', message: '' });
-  const [sent, setSent] = useState(false);
+const roles = [
+  { icon: GraduationCap, title: "Students", copy: "Turn every project, skill and contribution into a trusted record that travels with you." },
+  { icon: Building2, title: "Colleges", copy: "Issue credentials, activate campus commerce and see your community thrive in one place." },
+  { icon: BriefcaseBusiness, title: "Recruiters", copy: "Find proven talent through verified education, skills and real work—not inflated profiles." },
+];
 
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-sm" onClick={onClose}>
-      <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="glass-card p-6 w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-bold text-foreground">Contact a Verified Senior</h3>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
-        </div>
-        {sent ? (
-          <div className="text-center py-8">
-            <div className="w-12 h-12 rounded-full bg-success/20 flex items-center justify-center mx-auto mb-3">
-              <Star className="h-6 w-6 text-success" />
-            </div>
-            <p className="text-foreground font-semibold">Inquiry Sent!</p>
-            <p className="text-sm text-muted-foreground mt-1">A verified senior will reach out to you soon.</p>
-          </div>
-        ) : (
-          <form onSubmit={async e => { e.preventDefault(); await api.submitContactInquiry(form); setSent(true); }} className="space-y-3">
-            <input placeholder="Your Name" required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2.5 rounded-lg bg-input border border-border text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50" />
-            <input type="email" placeholder="Your Email" required value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="w-full px-3 py-2.5 rounded-lg bg-input border border-border text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50" />
-            <textarea placeholder="Your question or message..." required rows={3} value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} className="w-full px-3 py-2.5 rounded-lg bg-input border border-border text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none" />
-            <button type="submit" className="w-full px-4 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity">Submit Inquiry</button>
-          </form>
-        )}
-      </motion.div>
-    </div>
-  );
-}
+const MOCK_GIGS = [
+  { id: '1', title: 'Develop Smart Contract for Campus DAO', description: 'We need an experienced developer to write a basic voting smart contract in Solidity for our upcoming campus DAO.', reward: 1500, paid: true, mode: 'Remote', duration: '2 weeks', category: 'Engineering' },
+  { id: '2', title: 'UI Designer for E-cell Website', description: 'Looking for a UI/UX designer to redesign the landing page for our entrepreneurship cell. Figma required.', reward: 800, paid: true, mode: 'Hybrid', duration: '1 week', category: 'Design' },
+  { id: '3', title: 'Campus Ambassador (Techfest)', description: 'Represent our annual tech fest in your department. Help with marketing and registration.', reward: 500, paid: true, mode: 'On-campus', duration: '1 month', category: 'Marketing' },
+] as any[];
+
+const MOCK_COLLEGES = [
+  { id: 'c1', name: 'Meridian Institute of Tech', totalPoints: 12450 },
+  { id: 'c2', name: 'National College of Eng', totalPoints: 11200 },
+  { id: 'c3', name: 'State University', totalPoints: 9800 },
+];
+
+const MOCK_STUDENTS = [
+  { id: 's1', name: 'Amara Vance', totalPoints: 1420, collegeName: 'Meridian Institute' },
+  { id: 's2', name: 'Rahul Sharma', totalPoints: 1350, collegeName: 'National College' },
+  { id: 's3', name: 'Sarah Chen', totalPoints: 1280, collegeName: 'State University' },
+];
 
 export default function Landing() {
   const navigate = useNavigate();
-  const [colleges, setColleges] = useState<College[]>([]);
+  const prefersReduced = useReducedMotion();
   const [gigs, setGigs] = useState<Gig[]>([]);
   const [items, setItems] = useState<MarketplaceItem[]>([]);
-  const [search, setSearch] = useState('');
-  const [contactOpen, setContactOpen] = useState(false);
   const [collegeLeaderboard, setCollegeLeaderboard] = useState<any[]>([]);
   const [studentLeaderboard, setStudentLeaderboard] = useState<any[]>([]);
   const [lbCategory, setLbCategory] = useState('all');
 
   useEffect(() => {
-    api.getColleges().then(d => setColleges(Array.isArray(d) ? d : [])).catch(() => {});
-    api.getGigs().then(g => setGigs((Array.isArray(g) ? g : []).filter(x => x.status === 'open').slice(0, 3))).catch(() => {});
-    api.getMarketplaceItems().then(m => setItems((Array.isArray(m) ? m : []).filter(x => x.status === 'available').slice(0, 4))).catch(() => {});
-    api.getCollegeLeaderboard().then(d => setCollegeLeaderboard(Array.isArray(d) ? d : [])).catch(() => {});
-    api.getStudentLeaderboard().then(d => setStudentLeaderboard(Array.isArray(d) ? d : [])).catch(() => {});
+    api.getGigs().then((g) => {
+      const arr = Array.isArray(g) ? g.filter((x) => x.status === 'open') : [];
+      setGigs(arr.length > 0 ? arr.slice(0, 3) : MOCK_GIGS);
+    }).catch(() => setGigs(MOCK_GIGS));
+    
+    api.getMarketplaceItems().then((m) => setItems((Array.isArray(m) ? m : []).filter((x) => x.status === 'available').slice(0, 4))).catch(() => {});
+    
+    api.getCollegeLeaderboard().then((d) => {
+      const arr = Array.isArray(d) ? d : [];
+      setCollegeLeaderboard(arr.length > 0 ? arr : MOCK_COLLEGES);
+    }).catch(() => setCollegeLeaderboard(MOCK_COLLEGES));
+
+    api.getStudentLeaderboard().then((d) => {
+      const arr = Array.isArray(d) ? d : [];
+      setStudentLeaderboard(arr.length > 0 ? arr : MOCK_STUDENTS);
+    }).catch(() => setStudentLeaderboard(MOCK_STUDENTS));
   }, []);
 
   useEffect(() => {
     const cat = lbCategory === 'all' ? undefined : lbCategory;
-    api.getStudentLeaderboard(cat).then(d => setStudentLeaderboard(Array.isArray(d) ? d : [])).catch(() => {});
+    api.getStudentLeaderboard(cat).then((d) => {
+      const arr = Array.isArray(d) ? d : [];
+      setStudentLeaderboard(arr.length > 0 ? arr : MOCK_STUDENTS);
+    }).catch(() => setStudentLeaderboard(MOCK_STUDENTS));
   }, [lbCategory]);
 
-  const filtered = colleges.filter(c => (c.name || '').toLowerCase().includes(search.toLowerCase()) || (c.location || '').toLowerCase().includes(search.toLowerCase()));
-
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen overflow-hidden bg-background font-sans text-foreground">
       <Navbar />
-      <ContactModal open={contactOpen} onClose={() => setContactOpen(false)} />
 
-      {/* Hero */}
-      <section className="relative min-h-screen flex items-center overflow-hidden pt-16">
-        <div className="absolute inset-0 z-0">
-          <img src={heroBg} alt="" className="w-full h-full object-cover opacity-30" />
-          <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/70 to-background" />
-          <div className="absolute inset-0 bg-gradient-to-r from-background via-transparent to-background/60" />
-        </div>
-        <div className="container-main relative z-10 py-20">
-          <div className="flex flex-col lg:flex-row items-center gap-12">
-            <motion.div initial="hidden" animate="visible" variants={fadeUp} transition={{ duration: 0.6 }} className="max-w-2xl flex-1">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 border border-primary/30 text-primary text-[11px] cyber-label mb-6 chamfer-sm">
-                <span className="w-2 h-2 rounded-full bg-primary animate-pulse" /> SIGNAL ONLINE // COLLEGE ECOSYSTEM FEED
+      <section className="golden-glow relative overflow-hidden pb-10 pt-16 border-b border-line">
+        <div className="network-grid pointer-events-none absolute inset-0 opacity-35 [mask-image:linear-gradient(to_bottom,transparent,black_20%,transparent)]" />
+        
+        <main id="top" className="relative z-10 mx-auto grid max-w-[1400px] items-center gap-12 px-4 sm:px-6 lg:px-10 pb-8 pt-16 lg:grid-cols-12 lg:pt-20">
+          <motion.div className="lg:col-span-7" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}>
+            <span className="inline-flex items-center gap-2 rounded-full border border-primary bg-primary px-3 py-1.5 text-xs font-semibold uppercase text-primary tracking-widest" style={{ background: 'color-mix(in oklab, var(--primary) 10%, transparent)', borderColor: 'color-mix(in oklab, var(--primary) 30%, transparent)' }}>
+              <span className="h-1.5 w-1.5 rounded-full bg-primary" style={{ boxShadow: '0 0 6px var(--primary)' }} /> Decentralized · verified · on-chain
+            </span>
+            <h1 className="mt-8 max-w-[12ch] text-5xl font-bold leading-[1.05] sm:text-6xl md:text-7xl" style={{ fontFamily: '"Fraunces", serif' }}>
+              Where campuses meet <em className="text-primary not-italic drop-shadow-[0_0_15px_color-mix(in_oklab,var(--primary)_40%,transparent)]">trust.</em>
+            </h1>
+            <p className="mt-8 max-w-xl text-lg sm:text-xl leading-relaxed text-muted-foreground">Almadox gives students, faculty, colleges and recruiters one verified place to connect, work and grow. No bots. No fake profiles. Just real people and proven opportunity.</p>
+            <div className="mt-10 flex flex-wrap items-center gap-4">
+              <button onClick={() => navigate('/login')} className="btn-primary">Start verifying <ArrowRight size={17} /></button>
+              <button onClick={() => document.getElementById('network')?.scrollIntoView({ behavior: 'smooth' })} className="btn-ghost">Explore the network</button>
+            </div>
+            <div className="mt-12 flex flex-wrap items-center gap-5 text-sm text-muted-foreground">
+              <div className="flex -space-x-2">
+                <span className="grid size-10 place-items-center rounded-full bg-accent text-xs font-bold text-background ring-2 ring-background">MK</span>
+                <span className="grid size-10 place-items-center rounded-full bg-primary text-xs font-bold text-background ring-2 ring-background">AR</span>
+                <span className="grid size-10 place-items-center rounded-full bg-foreground text-xs font-bold text-background ring-2 ring-background">DL</span>
               </div>
-              <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black tracking-tight mb-6 cyber-heading leading-[1.1]">
-                <span className="text-foreground cyber-glitch" data-text="ONE PLATFORM.">ONE PLATFORM.</span><br />
-                <span className="gradient-text italic">EVERY COLLEGE.</span><br />
-                <span className="gradient-text italic">EVERY STUDENT.</span>
-              </h1>
-              <p className="text-base sm:text-lg text-muted-foreground mb-8 max-w-xl border-l-2 border-primary/40 pl-4">
-                CollegeVerse connects students, faculty, and recruiters in a unified ecosystem — with verified identities, MicroGigs, Marketplace, SBT wallets, and more.
-                <span className="inline-block w-2 h-5 align-middle bg-primary ml-2 animate-pulse" />
-              </p>
-              <div className="flex flex-wrap gap-3 mb-10">
-                <button onClick={() => navigate('/colleges')} className="px-6 py-3 border-2 border-primary text-primary min-h-11 cyber-label text-xs hover:bg-primary hover:text-primary-foreground transition-all chamfer-sm glow-primary">
-                  Get Started <ArrowRight className="inline h-4 w-4 ml-1" />
-                </button>
-                <button onClick={() => navigate('/leaderboard')} className="px-6 py-3 border-2 border-violet text-violet min-h-11 cyber-label text-xs hover:bg-violet hover:text-violet-foreground transition-all chamfer-sm">
-                  View Leaderboards
-                </button>
-                <button onClick={() => navigate('/login')} className="px-6 py-3 border border-border text-foreground min-h-11 cyber-label text-xs hover:border-primary hover:text-primary hover:shadow-[var(--box-shadow-neon-sm)] transition-all chamfer-sm">
-                  Login
-                </button>
-              </div>
-              {/* Stats row */}
-              <div className="cyber-terminal p-4 max-w-md">
-                <p className="text-[10px] cyber-label text-primary mb-3">&gt; live-network-stats</p>
-                <div className="flex gap-4 sm:gap-6">
-                  <div><p className="text-2xl font-bold text-foreground cyber-heading">50+</p><p className="text-[10px] text-muted-foreground cyber-label">Colleges</p></div>
-                  <div className="w-px bg-border" />
-                  <div><p className="text-2xl font-bold text-primary cyber-heading">10K+</p><p className="text-[10px] text-muted-foreground cyber-label">Students</p></div>
-                  <div className="w-px bg-border" />
-                  <div><p className="text-2xl font-bold text-foreground cyber-heading">₹5L+</p><p className="text-[10px] text-muted-foreground cyber-label">Earned</p></div>
+              <p><strong className="text-foreground stat-num text-lg">50+</strong> colleges · <strong className="text-foreground stat-num text-lg">10K+</strong> students</p>
+            </div>
+          </motion.div>
+
+          {/* Our Medallion Hero Graphic (Identity Frame) */}
+          <motion.div className="lg:col-span-5 flex justify-center lg:justify-end mt-12 lg:mt-0" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8, delay: 0.15 }}>
+            <div className="w-full max-w-[480px] rounded-[40px] bg-card p-4 shadow-2xl border border-line relative z-20 md:-translate-x-4">
+              {/* Top Graphic Area (The Coin) */}
+              <div className="relative h-[400px] w-full rounded-[32px] bg-surface overflow-hidden flex items-center justify-center border border-line">
+                {/* Background Pattern */}
+                <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, var(--foreground) 1px, transparent 0)', backgroundSize: '16px 16px' }} />
+                
+                <div className="coin-wrapper relative w-[240px] h-[240px] sm:w-[280px] sm:h-[280px]">
+                  <div className={prefersReduced ? 'coin w-full h-full' : 'coin w-full h-full animate-coin-rotate'}>
+                    <img src={almadoxCoin} alt="Almadox verified identity coin" className="relative z-10 w-full h-full object-contain drop-shadow-2xl" />
+                  </div>
+                  
+                  {/* Floating Orbit Nodes */}
+                  <div className="absolute -top-6 -right-6 w-16 h-16 rounded-full bg-card border flex items-center justify-center text-xs font-bold animate-float z-0" style={{ animationDelay: '0s', fontFamily: '"Fraunces", serif', borderColor: 'var(--accent)', color: 'var(--accent)', boxShadow: '0 0 16px color-mix(in oklab, var(--accent) 20%, transparent)' }}>SBT</div>
+                  <div className="absolute -bottom-4 -left-8 w-16 h-16 rounded-full bg-card border flex items-center justify-center text-xs font-bold animate-float z-0" style={{ animationDelay: '1s', fontFamily: '"Fraunces", serif', borderColor: 'var(--primary)', color: 'var(--primary)', boxShadow: '0 0 16px color-mix(in oklab, var(--primary) 20%, transparent)' }}>ID</div>
+                </div>
+
+                {/* Network Verified Overlay */}
+                <div className="absolute bottom-4 right-4 flex items-center gap-2 px-4 py-2 rounded-full bg-card/90 backdrop-blur-md border border-line shadow-sm">
+                  <BadgeCheck className="h-4 w-4 text-primary" />
+                  <span className="text-xs font-bold text-primary uppercase tracking-widest">Network verified</span>
+                </div>
+                <div className="absolute bottom-4 left-4 flex items-center px-4 py-2 rounded-full bg-card/90 backdrop-blur-md border border-line shadow-sm">
+                  <span className="text-xs font-bold text-foreground tracking-wide">Almadox Mainnet</span>
                 </div>
               </div>
-            </motion.div>
-
-            {/* Shader Coin Showcase */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.8, delay: 0.3 }}
-              className="flex-shrink-0 relative"
-            >
-              <ShaderShowcase coinSrc={cvrCoin} />
-            </motion.div>
+            </div>
+          </motion.div>
+        </main>
+        
+        {/* Scroll Indicator */}
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 animate-bounce flex flex-col items-center gap-2 opacity-50 hover:opacity-100 transition-opacity cursor-pointer z-20" onClick={() => document.getElementById('network')?.scrollIntoView({ behavior: 'smooth' })}>
+          <span className="mono-label text-[10px]" style={{ color: 'var(--muted-foreground)' }}>SCROLL</span>
+          <div className="w-8 h-8 rounded-full border border-line flex items-center justify-center bg-surface shadow-md hover:border-primary transition-colors">
+            <ChevronDown className="h-4 w-4 text-foreground" />
           </div>
         </div>
       </section>
 
-      {/* College Search */}
-      <section className="section-padding bg-secondary/20">
-        <div className="container-main">
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} transition={{ duration: 0.5 }}>
-            <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">Find Your College</h2>
-            <p className="text-muted-foreground mb-6">Search and explore top colleges across India</p>
-            <div className="relative max-w-lg mb-8">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search colleges by name or location..." className="w-full pl-10 pr-4 py-3 rounded-lg bg-input border border-border text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50" />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filtered.slice(0, 6).map(c => (
-                <div key={c.id} onClick={() => navigate(`/colleges/${c.id}`)} className="glass-card-hover p-5 cursor-pointer">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h3 className="font-semibold text-foreground">{c.name}</h3>
-                      <p className="text-sm text-muted-foreground">{c.location}</p>
-                    </div>
-                    <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary font-medium">#{c.ranking}</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mb-3">{(c.description || '').slice(0, 80)}...</p>
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs text-muted-foreground">{c.type} · {(c.studentCount || 0).toLocaleString()} students</span>
-                    <button onClick={e => { e.stopPropagation(); setContactOpen(true); }} className="text-xs text-cyan hover:underline">Contact Senior</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        </div>
+      {/* Network Features Bento */}
+      <section id="network" className="bg-background px-4 sm:px-6 lg:px-10 py-16 md:py-20 border-b border-line">
+        <motion.div className="mx-auto max-w-[1400px]" {...reveal}>
+          <p className="text-xs font-semibold uppercase text-primary tracking-widest">One network · every side of campus</p>
+          <div className="mt-4 max-w-2xl">
+            <h2 className="text-4xl sm:text-5xl font-bold leading-tight" style={{ fontFamily: '"Fraunces", serif' }}>A trusted layer for campus life.</h2>
+            <p className="mt-6 text-lg text-muted-foreground leading-relaxed">Identity is only the beginning. Almadox turns verification into access—to work, commerce, talent and recognition.</p>
+          </div>
+          <div className="mt-16 grid gap-6 md:grid-cols-12">
+            <FeatureCard className="md:col-span-7" icon={WalletCards} eyebrow="Verified identity · SBT wallet" title="Your achievements, permanently yours." copy="College ID and facial verification create a bot-free identity. Credentials, work and recognition then collect in a non-transferable wallet that recruiters can trust." identity tags={['College verified', 'Face matched', 'SBT issued']} />
+            <FeatureCard className="md:col-span-5" icon={BriefcaseBusiness} eyebrow="MicroGigs" title="Small tasks. Real earnings." copy="Complete short projects for verified campus teams and recruiters, earn money, and add proof of work to your record." tags={['Remote work', 'Paid tasks', 'Verified only']} />
+            <FeatureCard className="md:col-span-5" icon={ShoppingBag} eyebrow="Campus marketplace" title="Trade inside a trusted circle." copy="Buy and sell books, devices, services and essentials with verified people from your own college community." tags={['Campus-only', 'Secure trade']} />
+            <FeatureCard className="md:col-span-7" icon={Trophy} eyebrow="Live leaderboards" title="Recognition built on contribution." copy="Discover rising students and high-performing colleges through transparent rankings shaped by verified work and community impact." tags={['Merit-based', 'Transparent', 'Real-time']} />
+          </div>
+        </motion.div>
       </section>
 
-      {/* Leaderboard Preview */}
-      <section className="section-padding">
-        <div className="container-main">
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} transition={{ duration: 0.5 }}>
-            <div className="flex items-center justify-between mb-6">
+      {/* Dynamic Data Sections (Leaderboards, Gigs) */}
+      <section className="bg-surface/30 px-4 sm:px-6 lg:px-10 py-24 border-b border-line">
+        <div className="mx-auto max-w-[1400px] space-y-24">
+          
+          {/* Leaderboards */}
+          <motion.div {...reveal}>
+            <div className="flex items-center justify-between mb-10">
               <div>
-                <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">Leaderboards</h2>
-                <p className="text-muted-foreground">Top colleges and students ranked by performance</p>
+                <h2 className="text-3xl font-bold mb-2 text-foreground" style={{ fontFamily: '"Fraunces", serif' }}>Live Leaderboards</h2>
+                <p className="text-base text-muted-foreground">Top colleges and students ranked by performance</p>
               </div>
-              <button onClick={() => navigate('/leaderboard')} className="text-sm text-primary hover:underline font-medium">View All →</button>
+              <button onClick={() => navigate('/login')} className="btn-ghost text-xs px-5 py-2">View all <ArrowRight className="h-3 w-3" /></button>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* College */}
-              <div className="glass-card p-5">
-                <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2"><Trophy className="h-4 w-4 text-warning" /> College Rankings</h3>
+              <div className="rounded-2xl border border-line bg-card p-6 sm:p-8 soft-shadow">
+                <h3 className="font-semibold text-base mb-6 flex items-center gap-2 text-foreground" style={{ fontFamily: '"Fraunces", serif' }}>
+                  <Trophy className="h-5 w-5 text-accent" />
+                  College rankings
+                </h3>
                 <div className="space-y-2">
                   {collegeLeaderboard.slice(0, 5).map((c, i) => (
-                    <div key={c.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-secondary/30">
-                      <div className="flex items-center gap-3">
-                        <span className={`text-sm font-bold ${i === 0 ? 'text-warning' : i === 1 ? 'text-muted-foreground' : 'text-muted-foreground/70'}`}>#{i + 1}</span>
-                        <span className="text-sm font-medium text-foreground">{c.name}</span>
-                      </div>
-                      <span className="text-sm text-primary font-mono">{c.totalPoints} pts</span>
-                    </div>
+                    <Rank key={c.id} number={String(i + 1).padStart(2, '0')} name={c.name} score={c.totalPoints.toString()} isTop={i === 0} />
                   ))}
                 </div>
               </div>
               {/* Student */}
-              <div className="glass-card p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold text-foreground flex items-center gap-2"><Star className="h-4 w-4 text-cyan" /> Student Rankings</h3>
-                  <div className="flex gap-1">
-                    {['all', 'cultural', 'sports', 'education'].map(cat => (
-                      <button key={cat} onClick={() => setLbCategory(cat)} className={`text-xs px-2 py-1 rounded-md transition-colors ${lbCategory === cat ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground'}`}>
-                        {cat.charAt(0).toUpperCase() + cat.slice(1)}
+              <div className="rounded-2xl border border-line bg-card p-6 sm:p-8 soft-shadow">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+                  <h3 className="font-semibold text-base flex items-center gap-2 text-foreground" style={{ fontFamily: '"Fraunces", serif' }}>
+                    <Trophy className="h-5 w-5 text-primary" />
+                    Student rankings
+                  </h3>
+                  <div className="flex flex-wrap gap-1">
+                    {['all', 'cultural', 'sports', 'education'].map((cat) => (
+                      <button
+                        key={cat}
+                        onClick={() => setLbCategory(cat)}
+                        className="mono-label px-2.5 py-1.5 rounded transition-colors"
+                        style={{
+                          background: lbCategory === cat ? 'color-mix(in oklab, var(--primary) 12%, transparent)' : 'transparent',
+                          color: lbCategory === cat ? 'var(--primary)' : 'var(--muted-foreground)',
+                        }}
+                      >
+                        {cat}
                       </button>
                     ))}
                   </div>
                 </div>
                 <div className="space-y-2">
                   {studentLeaderboard.slice(0, 5).map((s, i) => (
-                    <div key={s.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-secondary/30">
-                      <div className="flex items-center gap-3">
-                        <span className={`text-sm font-bold ${i === 0 ? 'text-warning' : 'text-muted-foreground'}`}>#{i + 1}</span>
-                        <div>
-                          <span className="text-sm font-medium text-foreground">{s.name}</span>
-                          <span className="text-xs text-muted-foreground ml-2">{s.collegeName}</span>
-                        </div>
-                      </div>
-                      <span className="text-sm text-cyan font-mono">{s.totalPoints} pts</span>
-                    </div>
+                    <Rank key={s.id} number={String(i + 1).padStart(2, '0')} name={s.name} score={s.totalPoints.toString()} isTop={i === 0} sub={s.collegeName} />
                   ))}
                 </div>
               </div>
             </div>
           </motion.div>
-        </div>
-      </section>
 
-      {/* MicroGigs Preview */}
-      <section className="section-padding bg-secondary/20">
-        <div className="container-main">
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} transition={{ duration: 0.5 }}>
-            <div className="flex items-center justify-between mb-6">
+          {/* MicroGigs */}
+          <motion.div {...reveal}>
+            <div className="flex items-center justify-between mb-10">
               <div>
-                <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-1 flex items-center gap-2"><Zap className="h-6 w-6 text-warning" /> MicroGigs</h2>
-                <p className="text-muted-foreground">Short-term tasks, real rewards — earn while you learn</p>
+                <h2 className="text-3xl font-bold mb-2 text-foreground" style={{ fontFamily: '"Fraunces", serif' }}>Active MicroGigs</h2>
+                <p className="text-base text-muted-foreground">Short tasks, real rewards</p>
               </div>
-              <button onClick={() => navigate('/microgigs')} className="px-4 py-2 rounded-lg bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-colors">Browse All Gigs →</button>
+              <button onClick={() => navigate('/login')} className="btn-ghost text-xs px-5 py-2">Browse all <ArrowRight className="h-3 w-3" /></button>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {gigs.map(g => (
-                <div key={g.id} className="glass-card-hover p-5">
-                  <div className="flex items-start justify-between mb-3">
-                    <h3 className="font-semibold text-foreground text-sm">{g.title}</h3>
-                    {g.paid && <span className="text-xs px-2 py-0.5 rounded-full bg-success/10 text-success font-medium">₹{g.reward}</span>}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {gigs.map((g) => (
+                <article key={g.id} className="rounded-2xl border border-line bg-card p-6 sm:p-8 soft-shadow hover:-translate-y-1 transition-all duration-300 group flex flex-col h-full" style={{ borderColor: 'var(--line)' }} onMouseEnter={(e) => e.currentTarget.style.borderColor = 'color-mix(in oklab, var(--primary) 30%, transparent)'} onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--line)'}>
+                  <div className="flex items-start justify-between mb-4 gap-4">
+                    <h3 className="font-semibold text-lg leading-snug text-foreground group-hover:text-primary transition-colors" style={{ fontFamily: '"Fraunces", serif' }}>{g.title}</h3>
+                    {g.paid && <span className="flex-shrink-0 mono-label px-3 py-1 rounded-full text-primary" style={{ background: 'color-mix(in oklab, var(--primary) 10%, transparent)' }}>₹{g.reward}</span>}
                   </div>
-                  <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{g.description}</p>
-                  <div className="flex flex-wrap gap-1 mb-3">
-                    {(g.skills || []).slice(0, 3).map(s => <span key={s} className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">{s}</span>)}
-                  </div>
-                  <div className="flex justify-between text-xs text-muted-foreground">
+                  <p className="text-base mb-6 line-clamp-3 leading-relaxed text-muted-foreground">{g.description}</p>
+                  <div className="flex justify-between text-xs text-muted-foreground border-t border-line/50 pt-5 mt-auto mono-label">
                     <span>{g.mode} · {g.duration}</span>
                     <span>{g.category}</span>
                   </div>
-                </div>
+                </article>
               ))}
             </div>
           </motion.div>
+
         </div>
       </section>
 
-      {/* Marketplace Preview */}
-      <section className="section-padding">
-        <div className="container-main">
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} transition={{ duration: 0.5 }}>
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-1 flex items-center gap-2"><ShoppingBag className="h-6 w-6 text-violet" /> Marketplace</h2>
-                <p className="text-muted-foreground">Buy and sell within your verified campus community</p>
-              </div>
-              <button onClick={() => navigate('/marketplace')} className="px-4 py-2 rounded-lg bg-violet/10 text-violet text-sm font-medium hover:bg-violet/20 transition-colors">Browse Marketplace →</button>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {items.map(item => (
-                <div key={item.id} className="glass-card-hover p-4">
-                  <div className="w-full aspect-square rounded-lg bg-secondary/50 flex items-center justify-center mb-3">
-                    <ShoppingBag className="h-8 w-8 text-muted-foreground/30" />
-                  </div>
-                  <h3 className="font-medium text-foreground text-sm mb-1">{item.title}</h3>
-                  <p className="text-lg font-bold text-primary mb-1">₹{item.price}</p>
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>{item.condition}</span>
-                    <span>{item.category}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        </div>
+      {/* Community Roles */}
+      <section id="community" className="bg-background px-4 sm:px-6 lg:px-10 py-24 border-b border-line">
+        <motion.div className="mx-auto max-w-[1400px]" {...reveal}>
+          <div className="grid gap-6 md:grid-cols-3">
+            {roles.map(({ icon: Icon, title, copy }, index) => (
+              <article key={title} className="rounded-[24px] bg-card p-8 sm:p-10 shadow-sm border border-line hover:border-primary/30 transition-all hover:shadow-lg relative overflow-hidden group">
+                <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <span className="relative grid size-14 place-items-center rounded-xl bg-surface border border-line text-primary soft-shadow group-hover:scale-110 transition-transform duration-300"><Icon size={24} /></span>
+                <p className="relative mt-8 text-xs font-semibold uppercase text-primary tracking-widest">0{index + 1}</p>
+                <h3 className="relative mt-3 text-3xl font-bold text-foreground" style={{ fontFamily: '"Fraunces", serif' }}>{title}</h3>
+                <p className="relative mt-4 leading-relaxed text-muted-foreground text-lg">{copy}</p>
+              </article>
+            ))}
+          </div>
+        </motion.div>
       </section>
 
-      {/* Economic Ecosystem */}
-      <section className="section-padding bg-secondary/20">
-        <div className="container-main">
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} transition={{ duration: 0.5 }}>
-            <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-2 text-center">The CollegeVerse Economy</h2>
-            <p className="text-muted-foreground text-center mb-10 max-w-2xl mx-auto">A self-sustaining ecosystem where everyone earns, learns, and grows</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              {[
-                { title: 'Students Earn', icon: <TrendingUp className="h-5 w-5" />, color: 'text-cyan', items: ['MicroGigs completion', 'Marketplace sales', 'Tutoring & mentorship', 'Competition prizes'] },
-                { title: 'Faculty Earn', icon: <BookOpen className="h-5 w-5" />, color: 'text-violet', items: ['Workshop hosting', 'Mentorship programs', 'Curriculum consulting', 'Research grants'] },
-                { title: 'Colleges Earn', icon: <GraduationCap className="h-5 w-5" />, color: 'text-primary', items: ['Marketplace revenue share', 'Faculty workshop share', 'Sponsored events', 'Premium features'] },
-                { title: 'Recruiters Pay', icon: <Briefcase className="h-5 w-5" />, color: 'text-warning', items: ['Verified talent access', 'MicroGig posting', 'Assessment tools', 'Priority placements'] },
-              ].map(item => (
-                <div key={item.title} className="glass-card p-5">
-                  <div className={`${item.color} mb-3`}>{item.icon}</div>
-                  <h3 className="font-semibold text-foreground mb-3">{item.title}</h3>
-                  <ul className="space-y-2">
-                    {item.items.map(i => (
-                      <li key={i} className="text-sm text-muted-foreground flex items-center gap-2">
-                        <DollarSign className="h-3 w-3 text-success flex-shrink-0" /> {i}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        </div>
+      {/* Opportunities */}
+      <section id="opportunities" className="bg-foreground px-4 sm:px-6 lg:px-10 py-32 text-background relative overflow-hidden">
+        <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '32px 32px' }} />
+        <motion.div className="mx-auto grid max-w-[1400px] gap-16 md:grid-cols-2 md:items-center relative z-10" {...reveal}>
+          <div>
+            <p className="text-xs font-semibold uppercase text-accent tracking-widest">Proof becomes opportunity</p>
+            <h2 className="mt-6 max-w-lg text-4xl sm:text-5xl md:text-6xl font-bold leading-tight" style={{ fontFamily: '"Fraunces", serif' }}>A stronger signal than a polished résumé.</h2>
+            <p className="mt-8 max-w-xl leading-relaxed text-background/65 text-lg sm:text-xl">Every verified credential, completed MicroGig and campus contribution strengthens a living record of what you can do.</p>
+          </div>
+          <div className="space-y-4">
+            <ProofRow icon={BadgeCheck} text="College-issued identity and credentials" />
+            <ProofRow icon={Sparkles} text="Verified project outcomes and endorsements" />
+            <ProofRow icon={WalletCards} text="Portable, non-transferable SBT record" />
+          </div>
+        </motion.div>
       </section>
 
-      {/* CTA */}
-      <section className="section-padding">
-        <div className="container-main text-center">
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} transition={{ duration: 0.5 }}>
-            <h2 className="text-3xl sm:text-4xl font-bold gradient-text mb-4">Ready to Join CollegeVerse?</h2>
-            <p className="text-muted-foreground mb-8 max-w-lg mx-auto">Sign up with your college email to unlock the full student experience — verified identity, SBT wallet, and more.</p>
-            <div className="flex flex-wrap justify-center gap-3">
-              <button onClick={() => navigate('/login')} className="px-8 py-3 rounded-lg bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-all glow-primary">
-                Get Started <ArrowRight className="inline h-4 w-4 ml-1" />
-              </button>
-              <button onClick={() => navigate('/about')} className="px-8 py-3 rounded-lg bg-secondary text-secondary-foreground font-semibold hover:bg-secondary/80 transition-colors border border-border">
-                Learn More
-              </button>
-            </div>
-          </motion.div>
-        </div>
+      {/* Join CTA */}
+      <section id="join" className="golden-glow px-4 sm:px-6 lg:px-10 py-32 text-center border-t border-line">
+        <motion.div className="mx-auto max-w-3xl" {...reveal}>
+          <p className="text-xs font-semibold uppercase text-primary tracking-widest">The network is open</p>
+          <h2 className="mt-6 text-5xl sm:text-6xl md:text-7xl font-bold leading-tight" style={{ fontFamily: '"Fraunces", serif' }}>Bring your campus into the light.</h2>
+          <p className="mx-auto mt-8 max-w-2xl text-xl text-muted-foreground leading-relaxed">Verify once. Connect everywhere. Start building a campus identity that creates real value.</p>
+          <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <button onClick={() => navigate('/login')} className="btn-primary w-full sm:w-auto px-10 py-4 text-base">
+              Join the network <ArrowRight size={18} />
+            </button>
+          </div>
+        </motion.div>
       </section>
 
       <Footer />
+    </div>
+  );
+}
+
+// Subcomponents
+function FeatureCard({ icon: Icon, eyebrow, title, copy, className, identity, tags }: { icon: any; eyebrow: string; title: string; copy: string; className: string; identity?: boolean; tags?: string[] }) {
+  const color = identity ? 'var(--accent)' : 'var(--primary)';
+  return (
+    <motion.article whileHover={{ y: -4 }} transition={{ duration: 0.25 }} className={`${className} rounded-[32px] border border-line/80 bg-card p-8 sm:p-10 shadow-md hover:shadow-xl hover:border-primary/20 transition-all group flex flex-col`}>
+      <div className="flex items-center justify-between mb-8">
+        <span className="flex items-center justify-center size-14 rounded-2xl transition-colors" style={{
+          background: `color-mix(in oklab, ${color} 15%, transparent)`,
+          color: color
+        }}>
+          <Icon className="size-7" />
+        </span>
+        <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: color }}>{eyebrow}</span>
+      </div>
+      <h3 className="max-w-md text-3xl font-bold mb-4 leading-tight" style={{ fontFamily: '"Fraunces", serif' }}>{title}</h3>
+      <p className="max-w-xl leading-relaxed text-muted-foreground text-lg mb-8 flex-1">{copy}</p>
+      
+      {tags && tags.length > 0 && (
+        <div className="mt-auto flex flex-wrap gap-2.5 pt-4">
+          {tags.map(t => <Pill key={t} color={color}>{t}</Pill>)}
+        </div>
+      )}
+    </motion.article>
+  );
+}
+
+function Pill({ children, color }: { children: React.ReactNode, color: string }) { 
+  return <span className="rounded-full px-3.5 py-1.5 text-xs font-medium tracking-wide" style={{ background: `color-mix(in oklab, ${color} 10%, transparent)`, color: color, border: `1px solid color-mix(in oklab, ${color} 20%, transparent)`, fontFamily: '"Fraunces", serif' }}>{children}</span>; 
+}
+
+function Rank({ number, name, score, isTop, sub }: { number: string; name: string; score: string; isTop?: boolean, sub?: string }) { 
+  return (
+    <div className="flex items-center justify-between rounded-xl bg-surface/50 border border-line/50 px-5 py-3.5 text-sm hover:bg-surface transition-colors">
+      <div className="flex items-center gap-4">
+        <b className={`font-mono text-base ${isTop ? "text-accent" : "text-muted-foreground"}`}>{number}</b>
+        <div>
+          <span className="font-semibold text-foreground text-base">{name}</span>
+          {sub && <span className="text-xs ml-2 text-muted-foreground">{sub}</span>}
+        </div>
+      </div>
+      <b className="font-mono text-primary text-base">{score} pts</b>
+    </div>
+  ); 
+}
+
+function ProofRow({ icon: Icon, text }: { icon: any; text: string }) {
+  return (
+    <div className="flex items-center gap-4 rounded-full border border-line/20 bg-background/5 px-6 py-4 backdrop-blur-sm transition-colors hover:bg-background/10">
+      <div className="flex items-center justify-center size-8 rounded-full bg-accent/20 text-accent">
+        <Icon className="h-4 w-4" />
+      </div>
+      <span className="text-base font-medium text-background">{text}</span>
     </div>
   );
 }
