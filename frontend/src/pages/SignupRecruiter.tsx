@@ -11,14 +11,8 @@ const AUTH_DOT_LOTTIE_SRC =
   'https://lottie.host/7a753e3c-14a7-4657-b5dc-cd8c6b952ffd/F4qKTN4Ubz.lottie';
 
 export default function SignupRecruiter() {
-  const { signup, loginWithGoogle, loading } = useAuth();
+  const { loginWithGoogle, loading } = useAuth();
   const navigate = useNavigate();
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [company, setCompany] = useState('');
-  const [position, setPosition] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
 
   const handleGoogleSignup = async () => {
@@ -28,33 +22,6 @@ export default function SignupRecruiter() {
       navigate('/recruiter/dashboard');
     } catch (err: any) {
       setError(err?.message || 'Google sign-up failed.');
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError('Passwords do not match.');
-      return;
-    }
-
-    try {
-      await signup({ email, password, role: 'recruiter', name, company, position });
-      navigate('/recruiter/dashboard');
-    } catch (err: any) {
-      const msg = err?.message || '';
-      if (msg.includes('email-already-in-use')) {
-        setError('An account with this email already exists. Try logging in.');
-      } else {
-        setError(msg || 'Signup failed. Please try again.');
-      }
     }
   };
 
@@ -71,9 +38,9 @@ export default function SignupRecruiter() {
           <div className="text-center mb-8">
             <Briefcase className="h-10 w-10 text-cyan mx-auto mb-3" />
             <h1 className="text-2xl font-bold text-foreground">Recruiter Sign Up</h1>
-            <p className="text-sm text-muted-foreground mt-1">Join CollegeVerse to find verified talent from top colleges</p>
+            <p className="text-sm text-muted-foreground mt-1">Authenticate directly with your corporate Google account</p>
           </div>
-          <form onSubmit={handleSubmit} className="glass-card p-6 space-y-4">
+          <div className="glass-card p-6 space-y-5">
             {error && (
               <div className="flex gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
                 <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" /><span>{error}</span>
@@ -84,9 +51,9 @@ export default function SignupRecruiter() {
               type="button"
               onClick={handleGoogleSignup}
               disabled={loading}
-              className="w-full py-2.5 px-4 rounded-lg border border-border bg-card hover:bg-muted/50 text-foreground font-medium text-sm flex items-center justify-center gap-3 transition-colors shadow-sm disabled:opacity-50"
+              className="w-full py-3 px-4 rounded-xl border border-border bg-card hover:bg-muted/50 text-foreground font-semibold text-sm flex items-center justify-center gap-3 transition-colors shadow-md disabled:opacity-50"
             >
-              <svg className="h-4 w-4" viewBox="0 0 24 24">
+              <svg className="h-5 w-5" viewBox="0 0 24 24">
                 <path
                   fill="#4285F4"
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -104,49 +71,25 @@ export default function SignupRecruiter() {
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                 />
               </svg>
-              <span>Continue with Google</span>
+              <span>Continue with Corporate Google Account</span>
             </button>
 
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-border"></div>
+            <div className="p-4 rounded-xl bg-secondary/40 border border-border/60 text-xs space-y-2 text-muted-foreground">
+              <div className="font-semibold text-foreground flex items-center gap-1.5">
+                <span>💼 Verified Employer Network</span>
               </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">Or sign up with email</span>
-              </div>
+              <ul className="space-y-1.5 list-disc pl-4 text-[11px] leading-relaxed">
+                <li>Instant profile setup and workspace linkage via single sign-on.</li>
+                <li>Access to on-chain verified candidate pool and cryptographic credentials.</li>
+                <li>Post internship opportunities and direct campus talent pipelines.</li>
+              </ul>
             </div>
-            <div>
-              <label className="text-sm font-medium text-foreground mb-1 block">Full Name</label>
-              <input type="text" value={name} onChange={e => setName(e.target.value)} required placeholder="Vikram Singh" className="w-full px-3 py-2.5 rounded-lg bg-input border border-border text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50" />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground mb-1 block">Email</label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="name@company.com" className="w-full px-3 py-2.5 rounded-lg bg-input border border-border text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50" />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground mb-1 block">Company</label>
-              <input type="text" value={company} onChange={e => setCompany(e.target.value)} required placeholder="TechCorp India" className="w-full px-3 py-2.5 rounded-lg bg-input border border-border text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50" />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground mb-1 block">Position / Title</label>
-              <input type="text" value={position} onChange={e => setPosition(e.target.value)} required placeholder="HR Manager" className="w-full px-3 py-2.5 rounded-lg bg-input border border-border text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50" />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground mb-1 block">Password</label>
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="Min 6 characters" className="w-full px-3 py-2.5 rounded-lg bg-input border border-border text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50" />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground mb-1 block">Confirm Password</label>
-              <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required placeholder="••••••••" className="w-full px-3 py-2.5 rounded-lg bg-input border border-border text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50" />
-            </div>
-            <button type="submit" disabled={loading} className="w-full px-4 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2">
-              {loading ? <><DotLottieLoader size={18} src={AUTH_DOT_LOTTIE_SRC} /> Creating account...</> : 'Create Account'}
-            </button>
-            <p className="text-center text-sm text-muted-foreground">
+
+            <p className="text-center text-sm text-muted-foreground pt-2">
               Already have an account?{' '}
               <Link to="/login/recruiter" className="text-primary hover:underline font-medium">Sign in</Link>
             </p>
-          </form>
+          </div>
           </motion.div>
           <AuthIllustration className="order-1 lg:order-2" />
         </div>
