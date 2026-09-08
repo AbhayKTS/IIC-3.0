@@ -16,24 +16,18 @@ const studentNav: NavItem[] = [
   { label: 'Leaderboard', href: '/student/leaderboard', icon: <Trophy className="h-4 w-4" /> },
   { label: 'Events', href: '/student/events', icon: <Calendar className="h-4 w-4" /> },
   { label: 'Placements', href: '/student/placements', icon: <Briefcase className="h-4 w-4" /> },
-  { label: 'Communities', href: '/student/communities', icon: <Users className="h-4 w-4" /> },
-  { label: 'Clubs', href: '/student/clubs', icon: <Users className="h-4 w-4" /> },
-  { label: 'Chat', href: '/student/chat', icon: <MessageSquare className="h-4 w-4" /> },
   { label: 'Wallet', href: '/student/wallet', icon: <Wallet className="h-4 w-4" /> },
   { label: 'MicroGigs', href: '/student/microgigs', icon: <Zap className="h-4 w-4" /> },
   { label: 'Marketplace', href: '/student/marketplace', icon: <ShoppingBag className="h-4 w-4" /> },
-  { label: 'Competitions', href: '/student/competitions', icon: <Swords className="h-4 w-4" /> },
 ];
 
 const collegeNav: NavItem[] = [
   { label: 'Dashboard', href: '/college/dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
   { label: 'Verification', href: '/college/verification', icon: <UserCheck className="h-4 w-4" /> },
   { label: 'Notices', href: '/college/notices', icon: <Bell className="h-4 w-4" /> },
-  { label: 'Communities', href: '/college/communities', icon: <Users className="h-4 w-4" /> },
   { label: 'Events', href: '/college/events', icon: <Calendar className="h-4 w-4" /> },
   { label: 'Analytics', href: '/college/analytics', icon: <BarChart3 className="h-4 w-4" /> },
   { label: 'Recruiters', href: '/college/recruiters', icon: <Briefcase className="h-4 w-4" /> },
-  { label: 'Club Approvals', href: '/college/clubs-approvals', icon: <Shield className="h-4 w-4" /> },
   { label: 'Marketplace Mod', href: '/college/marketplace-moderation', icon: <ShoppingBag className="h-4 w-4" /> },
 ];
 
