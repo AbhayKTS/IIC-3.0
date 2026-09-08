@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { auth } from '@/lib/firebase';
 import {
   Camera,
   CameraOff,
@@ -8,15 +8,25 @@ import {
   XCircle,
   AlertCircle,
   Loader2,
-  RefreshCw,
   ShieldCheck,
   ShieldAlert,
-  ClockIcon,
+  Clock as ClockIcon,
+  RefreshCw,
+  Sparkles,
+  Timer,
 } from 'lucide-react';
-import { auth } from '@/lib/firebase';
+import { Button } from '@/components/ui/button';
+
+interface Props {
+  onVerified: (result: VerificationResult) => void;
+  onClose: () => void;
+  studentName?: string;
+  studentEmail?: string;
+  collegeName?: string;
+}
 
 const API_BASE = (() => {
-  const envUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL;
+  const envUrl = import.meta.env.VITE_API_URL;
   if (envUrl && envUrl.startsWith('http')) return envUrl;
   if (typeof window !== 'undefined' && window.location.hostname.includes('web.app'))
     return 'https://iic-3-0-ansh.vercel.app/api/v1';
@@ -31,6 +41,7 @@ type ScanPhase =
   | 'camera_init'
   | 'camera_denied'
   | 'live'
+  | 'captured'
   | 'scanning'
   | 'reading'
   | 'comparing'
@@ -60,22 +71,12 @@ interface VerificationResult {
   verificationMethod?: string;
 }
 
-interface Props {
-  onVerified: (result: VerificationResult) => void;
-  onClose: () => void;
-  studentName?: string;
-  studentEmail?: string;
-  collegeName?: string;
-}
-
-// ── Human-readable field labels ───────────────────────────────────────────────
 const FIELD_LABELS: Record<string, string> = {
-  institution: 'Institution',
+  institution: 'University / College',
   student_name: 'Student Name',
-  enrollment_number: 'Enrollment Number',
-  document_type: 'Document Type',
+  enrollment_number: 'Enrollment / Roll No',
+  document_type: 'Valid Student ID Card',
   document_readability: 'ID Readability',
-  ocr: 'Document Scan',
 };
 
 function fieldLabel(field: string) {
@@ -101,6 +102,12 @@ export default function CameraIdScanner({
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
 
+  // Photo capture & preview states
+  const [capturedImageUrl, setCapturedImageUrl] = useState<string | null>(null);
+  const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
+  const [flashActive, setFlashActive] = useState<boolean>(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+
   // ── Camera management ──────────────────────────────────────────────────────
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -112,12 +119,16 @@ export default function CameraIdScanner({
     setPhase('camera_init');
     setErrorMsg('');
     setVerificationResult(null);
+    setCapturedImageUrl(null);
+    setCapturedBlob(null);
+    setCountdown(null);
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: 'environment' },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
+          width: { ideal: 1920, min: 1280 },
+          height: { ideal: 1080, min: 720 },
         },
         audio: false,
       });
@@ -145,32 +156,65 @@ export default function CameraIdScanner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Capture + verify ───────────────────────────────────────────────────────
-  const handleScan = async () => {
+  // ── Snap Photo Action ──────────────────────────────────────────────────────
+  const takeSnapshot = useCallback(async () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
 
-    // Capture frame from live stream
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
+    // Flash animation
+    setFlashActive(true);
+    setTimeout(() => setFlashActive(false), 200);
+
+    // Capture highest resolution available from video
+    const w = video.videoWidth || 1280;
+    const h = video.videoHeight || 720;
+    canvas.width = w;
+    canvas.height = h;
+
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, 0, 0, w, h);
 
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
     const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.92)
+      canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.95)
     );
+
     if (!blob) {
       setPhase('error');
       setErrorMsg('Failed to capture frame from camera.');
       return;
     }
 
-    // Stop camera stream immediately after capture
+    // Stop live stream immediately so the user knows the capture is completed
     stopCamera();
 
-    // Animated status phases
+    setCapturedImageUrl(dataUrl);
+    setCapturedBlob(blob);
+    setPhase('captured');
+  }, [stopCamera]);
+
+  // ── Timer-assisted capture (3s countdown) ──────────────────────────────────
+  const startTimerCapture = () => {
+    setCountdown(3);
+  };
+
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
+    } else if (countdown === 0) {
+      setCountdown(null);
+      takeSnapshot();
+    }
+  }, [countdown, takeSnapshot]);
+
+  // ── Send Captured Photo to Azure OCR & Verification Engine ─────────────────
+  const handleVerifyCapturedPhoto = async () => {
+    if (!capturedBlob) return;
+
     setPhase('scanning');
     await delay(600);
     setPhase('reading');
@@ -178,7 +222,7 @@ export default function CameraIdScanner({
     try {
       const token = await auth.currentUser?.getIdToken();
       const formData = new FormData();
-      formData.append('idCard', blob, 'camera-scan.jpg');
+      formData.append('idCard', capturedBlob, 'camera-scan.jpg');
 
       const res = await fetch(`${API_BASE}/student/verify-id-card`, {
         method: 'POST',
@@ -194,18 +238,14 @@ export default function CameraIdScanner({
         );
       }
 
-      // ── Read the backend verification result ──────────────────────────────
-      // The backend returns idVerification inside payload.data
       const idVerification: VerificationResult =
         payload?.data?.idVerification || payload?.idVerification || {};
 
       setVerificationResult(idVerification);
 
       setPhase('comparing');
-      await delay(1200);
+      await delay(900);
 
-      // ── Map backend status to UI phase ────────────────────────────────────
-      // CRITICAL: we read the BACKEND status, not infer from frontend checks
       const backendStatus: BackendStatus = idVerification.status as BackendStatus;
 
       if (backendStatus === 'VERIFIED') {
@@ -213,9 +253,8 @@ export default function CameraIdScanner({
         onVerified(idVerification);
       } else if (backendStatus === 'REQUIRES_REVIEW') {
         setPhase('result_review');
-        onVerified(idVerification); // Still notify parent (dashboard will update)
+        onVerified(idVerification);
       } else {
-        // FAILED — show specific failure reason from backend
         setPhase('result_failed');
         setErrorMsg(idVerification.reasonMessage || 'Verification failed. Please try again.');
       }
@@ -225,9 +264,11 @@ export default function CameraIdScanner({
     }
   };
 
-  const handleRetry = () => {
+  const handleRetake = () => {
     setVerificationResult(null);
     setErrorMsg('');
+    setCapturedImageUrl(null);
+    setCapturedBlob(null);
     startCamera();
   };
 
@@ -235,11 +276,11 @@ export default function CameraIdScanner({
   return (
     <div className="flex flex-col items-center gap-0 w-full select-none">
 
-      {/* ── CAMERA INIT + LIVE ─────────────────────────────────────────────── */}
+      {/* ── CAMERA INIT + LIVE PREVIEW ──────────────────────────────────────── */}
       {(phase === 'camera_init' || phase === 'live') && (
         <div className="w-full flex flex-col items-center gap-4">
-          <p className="text-sm text-muted-foreground text-center">
-            Hold your <span className="text-foreground font-semibold">physical college ID card</span> inside the frame
+          <p className="text-xs text-muted-foreground text-center">
+            Position your <span className="text-foreground font-semibold">physical college ID card</span> inside the frame
           </p>
 
           {/* Camera viewport */}
@@ -247,23 +288,40 @@ export default function CameraIdScanner({
             <video
               ref={videoRef}
               className="w-full object-cover"
-              style={{ minHeight: 240, maxHeight: 320 }}
-              autoPlay muted playsInline
+              style={{ minHeight: 230, maxHeight: 300 }}
+              autoPlay
+              muted
+              playsInline
             />
+
+            {/* Flash Effect */}
+            {flashActive && (
+              <div className="absolute inset-0 bg-white z-20 animate-out fade-out duration-200" />
+            )}
+
+            {/* Countdown Overlay */}
+            {countdown !== null && (
+              <div className="absolute inset-0 z-30 bg-black/60 flex items-center justify-center">
+                <span className="text-6xl font-extrabold text-white animate-ping">
+                  {countdown}
+                </span>
+              </div>
+            )}
 
             {/* Scanning frame overlay */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="relative w-52 h-36">
-                <span className="absolute top-0 left-0 w-7 h-7 border-t-2 border-l-2 border-primary rounded-tl-md" />
-                <span className="absolute top-0 right-0 w-7 h-7 border-t-2 border-r-2 border-primary rounded-tr-md" />
-                <span className="absolute bottom-0 left-0 w-7 h-7 border-b-2 border-l-2 border-primary rounded-bl-md" />
-                <span className="absolute bottom-0 right-0 w-7 h-7 border-b-2 border-r-2 border-primary rounded-br-md" />
+              <div className="relative w-56 h-36 border border-primary/30 rounded-xl bg-primary/5">
+                <span className="absolute -top-1 -left-1 w-6 h-6 border-t-3 border-l-3 border-primary rounded-tl-lg" />
+                <span className="absolute -top-1 -right-1 w-6 h-6 border-t-3 border-r-3 border-primary rounded-tr-lg" />
+                <span className="absolute -bottom-1 -left-1 w-6 h-6 border-b-3 border-l-3 border-primary rounded-bl-lg" />
+                <span className="absolute -bottom-1 -right-1 w-6 h-6 border-b-3 border-r-3 border-primary rounded-br-lg" />
+
                 {phase === 'live' && (
                   <div className="absolute inset-x-0 top-0 h-0.5 bg-primary/80 animate-scan-line" />
                 )}
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-[9px] text-primary/50 tracking-widest uppercase font-semibold">
-                    PLACE ID HERE
+                  <span className="text-[10px] text-primary/70 tracking-widest uppercase font-semibold bg-background/60 px-2 py-0.5 rounded backdrop-blur-sm">
+                    FIT ID CARD HERE
                   </span>
                 </div>
               </div>
@@ -279,23 +337,81 @@ export default function CameraIdScanner({
           {phase === 'live' && (
             <div className="flex items-center gap-1.5 text-xs text-emerald-500 font-semibold">
               <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              LIVE CAMERA
+              LIVE CAMERA ACTIVE
             </div>
           )}
 
-          <Button
-            size="lg"
-            disabled={phase !== 'live'}
-            onClick={handleScan}
-            className="w-full max-w-sm gap-2 font-semibold text-base shadow-lg"
-          >
-            <ScanLine className="h-5 w-5" />
-            Scan ID Card
-          </Button>
+          {/* Action Buttons: Instant Snap & 3-Second Timer */}
+          <div className="w-full max-w-sm flex gap-2">
+            <Button
+              size="lg"
+              disabled={phase !== 'live' || countdown !== null}
+              onClick={takeSnapshot}
+              className="flex-1 gap-2 font-semibold text-sm shadow-md"
+            >
+              <Camera className="h-4 w-4" />
+              Capture ID Photo
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              disabled={phase !== 'live' || countdown !== null}
+              onClick={startTimerCapture}
+              className="gap-1.5 text-xs font-medium px-3"
+              title="3-second timer so you can hold ID card steady with both hands"
+            >
+              <Timer className="h-4 w-4" />
+              3s Timer
+            </Button>
+          </div>
 
-          <p className="text-xs text-muted-foreground text-center px-4">
-            The system will compare your ID against your registered profile.
-            Camera captures are not stored.
+          <p className="text-[11px] text-muted-foreground text-center px-4">
+            Once captured, the photo is frozen so you <strong>do not have to hold the card</strong> while OCR verifies it.
+          </p>
+        </div>
+      )}
+
+      {/* ── PHOTO CAPTURED (REVIEW & CONFIRMATION) ───────────────────────────── */}
+      {phase === 'captured' && capturedImageUrl && (
+        <div className="w-full flex flex-col items-center gap-4 animate-in fade-in zoom-in-95 duration-200">
+          {/* Prominent success notification */}
+          <div className="w-full p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs flex items-center justify-center gap-2 font-semibold shadow-sm">
+            <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+            <span>Photo Captured! You can put your ID card down now.</span>
+          </div>
+
+          {/* Display captured photo */}
+          <div className="relative w-full max-w-sm rounded-2xl overflow-hidden bg-black border-2 border-primary/50 shadow-2xl">
+            <img
+              src={capturedImageUrl}
+              alt="Captured College ID"
+              className="w-full object-cover"
+              style={{ minHeight: 210, maxHeight: 290 }}
+            />
+            <div className="absolute bottom-2 left-2 right-2 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-border/60 text-[11px] text-muted-foreground flex items-center justify-between">
+              <span>Photo ready for AI OCR</span>
+              <span className="text-primary font-semibold">High Quality</span>
+            </div>
+          </div>
+
+          <div className="w-full max-w-sm flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleRetake}
+              className="flex-1 gap-1.5 text-sm"
+            >
+              <RefreshCw className="h-4 w-4" /> Retake Photo
+            </Button>
+            <Button
+              onClick={handleVerifyCapturedPhoto}
+              className="flex-1 gap-2 text-sm font-semibold shadow-lg bg-primary hover:bg-primary/90"
+            >
+              <Sparkles className="h-4 w-4" /> Verify ID Card
+            </Button>
+          </div>
+
+          <p className="text-[11px] text-muted-foreground text-center">
+            Make sure your name, roll number, and college name are readable before submitting.
           </p>
         </div>
       )}
@@ -320,38 +436,57 @@ export default function CameraIdScanner({
         </div>
       )}
 
-      {/* ── PROCESSING PHASES ─────────────────────────────────────────────── */}
+      {/* ── PROCESSING PHASES (SCANNING THE CAPTURED PHOTO) ─────────────────── */}
       {(phase === 'scanning' || phase === 'reading' || phase === 'comparing') && (
-        <div className="w-full max-w-sm flex flex-col items-center gap-6 py-8 text-center">
-          <div className="relative w-48 h-32 rounded-xl border-2 border-primary/40 bg-secondary/30 flex items-center justify-center overflow-hidden">
-            <div className="absolute inset-x-0 top-0 h-0.5 bg-primary animate-scan-line" />
-            <ScanLine className="h-10 w-10 text-primary/30" />
+        <div className="w-full max-w-sm flex flex-col items-center gap-4 py-2 text-center animate-in fade-in duration-200">
+          {/* Show the captured photo with neon scan laser overlaid */}
+          <div className="relative w-full rounded-2xl overflow-hidden bg-black border-2 border-primary shadow-2xl">
+            {capturedImageUrl && (
+              <img
+                src={capturedImageUrl}
+                alt="Captured ID scan in progress"
+                className="w-full object-cover opacity-80"
+                style={{ minHeight: 210, maxHeight: 270 }}
+              />
+            )}
+            <div className="absolute inset-0 bg-primary/10 pointer-events-none" />
+            <div className="absolute inset-x-0 top-0 h-1 bg-cyan-400 shadow-[0_0_15px_#22d3ee] animate-scan-line pointer-events-none" />
+            <div className="absolute bottom-3 left-3 right-3 bg-black/75 backdrop-blur-md px-3 py-2 rounded-xl border border-white/10 text-left">
+              <div className="flex items-center gap-2 text-xs font-semibold text-white">
+                <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
+                {phase === 'scanning' && 'Processing captured photo…'}
+                {phase === 'reading' && 'Azure AI extracting ID card fields…'}
+                {phase === 'comparing' && 'Comparing against university records…'}
+              </div>
+            </div>
           </div>
-          <div className="space-y-2">
-            <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />
-            <p className="font-semibold text-foreground text-sm">
-              {phase === 'scanning' && 'Capturing frame…'}
-              {phase === 'reading' && 'Reading your college ID…'}
-              {phase === 'comparing' && 'Comparing against your registered profile…'}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {phase === 'reading' && 'Azure Document Intelligence is extracting your ID fields.'}
-              {phase === 'comparing' && 'Checking institution, name, and enrollment number.'}
-            </p>
+
+          {/* Stepper indication showing that holding is complete */}
+          <div className="w-full p-3 rounded-xl bg-secondary/30 border border-border/60 text-left space-y-1.5 text-xs">
+            <div className="flex items-center gap-2 text-emerald-500 font-medium">
+              <CheckCircle2 className="h-4 w-4" />
+              <span>Step 1: ID photo captured (Card no longer needed in hand)</span>
+            </div>
+            <div className="flex items-center gap-2 text-primary font-medium">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>
+                {phase === 'reading' ? 'Step 2: Azure Document Intelligence reading credentials...' : 'Step 3: Cryptographic verification on Polygon...'}
+              </span>
+            </div>
           </div>
         </div>
       )}
 
       {/* ── RESULT: VERIFIED ──────────────────────────────────────────────── */}
       {phase === 'result_verified' && verificationResult && (
-        <div className="w-full max-w-sm flex flex-col gap-4 py-4">
+        <div className="w-full max-w-sm flex flex-col gap-4 py-3 animate-in fade-in zoom-in-95 duration-200">
           <div className="flex flex-col items-center gap-2">
             <div className="p-3 rounded-full bg-emerald-500/15">
               <ShieldCheck className="h-9 w-9 text-emerald-500" />
             </div>
             <h3 className="font-bold text-lg text-foreground">Identity Verified</h3>
             <p className="text-xs text-muted-foreground text-center">
-              College Email + Live ID Scan
+              College Email + Live ID Scan Matched
             </p>
           </div>
 
@@ -364,7 +499,7 @@ export default function CameraIdScanner({
           />
 
           <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs text-center font-medium">
-            ✓ All required identity fields matched successfully.
+            ✓ All required identity fields matched successfully. Soulbound Token minting ready.
           </div>
 
           <Button className="w-full" onClick={onClose}>
@@ -375,7 +510,7 @@ export default function CameraIdScanner({
 
       {/* ── RESULT: REQUIRES REVIEW ───────────────────────────────────────── */}
       {phase === 'result_review' && verificationResult && (
-        <div className="w-full max-w-sm flex flex-col gap-4 py-4">
+        <div className="w-full max-w-sm flex flex-col gap-4 py-3 animate-in fade-in zoom-in-95 duration-200">
           <div className="flex flex-col items-center gap-2">
             <div className="p-3 rounded-full bg-amber-500/15">
               <ClockIcon className="h-9 w-9 text-amber-500" />
@@ -396,8 +531,8 @@ export default function CameraIdScanner({
           </div>
 
           <div className="flex gap-2">
-            <Button variant="outline" className="flex-1" onClick={handleRetry}>
-              <RefreshCw className="h-4 w-4 mr-1.5" /> Rescan
+            <Button variant="outline" className="flex-1" onClick={handleRetake}>
+              <RefreshCw className="h-4 w-4 mr-1.5" /> Retake Photo
             </Button>
             <Button className="flex-1" onClick={onClose}>
               Go to Dashboard
@@ -408,7 +543,7 @@ export default function CameraIdScanner({
 
       {/* ── RESULT: FAILED ────────────────────────────────────────────────── */}
       {phase === 'result_failed' && (
-        <div className="w-full max-w-sm flex flex-col gap-4 py-4">
+        <div className="w-full max-w-sm flex flex-col gap-4 py-3 animate-in fade-in zoom-in-95 duration-200">
           <div className="flex flex-col items-center gap-2">
             <div className="p-4 rounded-full bg-destructive/10">
               <ShieldAlert className="h-9 w-9 text-destructive" />
@@ -430,12 +565,12 @@ export default function CameraIdScanner({
             {errorMsg || verificationResult?.reasonMessage || 'Verification failed.'}
           </div>
 
-          <Button onClick={handleRetry} className="gap-2 w-full">
-            <RefreshCw className="h-4 w-4" /> Scan Again
+          <Button onClick={handleRetake} className="gap-2 w-full">
+            <RefreshCw className="h-4 w-4" /> Capture Photo Again
           </Button>
 
           <p className="text-xs text-muted-foreground text-center">
-            Make sure you are scanning your <strong>college-issued student ID card</strong> — not an event badge or other document.
+            Hold your <strong>college-issued student ID card</strong> steady and ensure good lighting so text is clear.
           </p>
         </div>
       )}
@@ -448,7 +583,7 @@ export default function CameraIdScanner({
           </div>
           <h3 className="font-semibold text-foreground">Camera Error</h3>
           <p className="text-sm text-muted-foreground">{errorMsg}</p>
-          <Button onClick={handleRetry} className="gap-2 w-full">
+          <Button onClick={handleRetake} className="gap-2 w-full">
             <RefreshCw className="h-4 w-4" /> Retry
           </Button>
         </div>
@@ -477,7 +612,6 @@ interface ChecksListProps {
 
 function ChecksList({ matchedFields, failedFields, extractedData, studentEmail, collegeName }: ChecksListProps) {
   const allFields = [
-    // Always show institutional email if we have it
     studentEmail ? { key: 'email', label: 'Institutional Email', value: studentEmail, matched: true } : null,
     ...matchedFields.map((f) => ({ key: f, label: fieldLabel(f), value: getFieldValue(f, extractedData, collegeName), matched: true })),
     ...failedFields.map((f) => ({ key: f, label: fieldLabel(f), value: null, matched: false })),

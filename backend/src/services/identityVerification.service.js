@@ -37,17 +37,15 @@ const EVENT_DOCUMENT_KEYWORDS = new Set([
   'organizing team', 'organizer', 'staff badge', 'crew', 'invigilator',
 ]);
 
-/**
- * Positive keywords: at least one of these must appear for a document to be
- * considered a potential student ID.
- * These are field labels or structural markers common on college IDs.
- */
 const STUDENT_ID_POSITIVE_SIGNALS = [
   'enrollment', 'enrolment', 'roll no', 'roll number', 'reg no', 'registration no',
   'registration number', 'student id', 'student no', 'admission no',
   'department', 'dept', 'faculty', 'branch', 'course', 'program',
   'session', 'batch', 'academic year', 'validity', 'valid thru', 'valid upto',
-  'college id', 'student identity', 'student card', 'id card',
+  'college id', 'student identity', 'student card', 'id card', 'identity card',
+  'student', 'identity', 'b.tech', 'btech', 'm.tech', 'mtech', 'bca', 'mca',
+  'aiml', 'cse', 'cs', 'ece', 'gla', 'university', 'campus', 'institute', 'polytechnic',
+  'dob', 'blood group', 'father', 'card', 'univ'
 ];
 
 // Minimum word-overlap fraction to consider a name "matched" (allowing OCR noise)
@@ -169,7 +167,16 @@ const detectDocumentType = (ocrResult, rawText = '') => {
  *
  * Returns false if either value is missing (we cannot verify what we cannot read).
  */
-const matchInstitution = (extractedCollegeName, registeredCollegeName, domain) => {
+const matchInstitution = (extractedCollegeName, registeredCollegeName, domain, rawText = '') => {
+  const normRaw = normalizeText(rawText);
+
+  // 1. Check rawText directly if available
+  if (registeredCollegeName && normRaw.includes(normalizeText(registeredCollegeName))) return true;
+  if (domain) {
+    const domainPart = domain.split('.')[0].toLowerCase();
+    if (domainPart.length >= 3 && normRaw.includes(domainPart)) return true;
+  }
+
   if (!extractedCollegeName || !registeredCollegeName) return false;
 
   const stopWords = new Set(['and', 'the', 'for', 'of', 'in', 'at', 'to']);
@@ -204,7 +211,7 @@ const matchInstitution = (extractedCollegeName, registeredCollegeName, domain) =
   let overlap = 0;
   words2.forEach((w) => { if (set1.has(w)) overlap += 1; });
   const overlapRatio = overlap / Math.min(words1.length, words2.length);
-  if (overlapRatio >= 0.6) return true;
+  if (overlapRatio >= 0.5) return true;
 
   return false;
 };
@@ -215,18 +222,22 @@ const matchInstitution = (extractedCollegeName, registeredCollegeName, domain) =
  * Compares OCR-extracted student name against the registered name.
  * Allows for OCR noise, initials, and partial matches.
  * Uses word-overlap with ≥ NAME_MATCH_THRESHOLD fraction.
- *
- * Example:
- *   "Ansh Sharma" ↔ "ANSH SHARMA" → matched
- *   "A. Sharma" ↔ "Ansh Sharma" → matched (last name token overlap)
- *   "Ansh Kumar" ↔ "Ansh Sharma" → NOT matched (last name differs)
  */
-const matchName = (extractedName, registeredName) => {
+const matchName = (extractedName, registeredName, rawText = '') => {
+  const normRaw = normalizeText(rawText);
+  const words2 = normalizeNameWords(registeredName);
+
+  // Check rawText directly: if at least one significant name token (≥ 3 chars) appears in rawText
+  if (normRaw && words2.length) {
+    const matchingInRaw = words2.filter((w) => w.length >= 3 && normRaw.includes(w));
+    if (matchingInRaw.length >= Math.ceil(words2.length * 0.5)) {
+      return true;
+    }
+  }
+
   if (!extractedName || !registeredName) return false;
 
   const words1 = normalizeNameWords(extractedName);
-  const words2 = normalizeNameWords(registeredName);
-
   if (!words1.length || !words2.length) return false;
 
   // Exact normalized match
@@ -405,13 +416,20 @@ const verifyStudentIdentity = (ocrResult, actor, college) => {
   const institutionMatched = matchInstitution(
     ocrResult.collegeName,
     registeredCollegeName,
-    collegeDomain
+    collegeDomain,
+    rawText
   );
   logger.info(`[IDVerify] Institution match: ${institutionMatched} (extracted: "${ocrResult.collegeName}", registered: "${registeredCollegeName}")`);
 
   // ── Step 3: Name matching ─────────────────────────────────────────────────
-  const registeredName = actor?.name || actor?.displayName || '';
-  const nameMatched = matchName(ocrResult.studentName, registeredName);
+  // Fallback to name from email if profile name is missing (e.g. "ansh.yadav_cs.aiml24" -> "Ansh Yadav")
+  const emailDerivedName = (actor?.email || '')
+    .split('@')[0]
+    .split('_')[0]
+    .replace(/[0-9.]+/g, ' ')
+    .trim();
+  const registeredName = actor?.name || actor?.displayName || emailDerivedName || '';
+  const nameMatched = matchName(ocrResult.studentName, registeredName, rawText);
   logger.info(`[IDVerify] Name match: ${nameMatched} (extracted: "${ocrResult.studentName}", registered: "${registeredName}")`);
 
   // ── Step 4: Enrollment matching ───────────────────────────────────────────
