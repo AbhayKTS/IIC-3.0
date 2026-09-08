@@ -191,7 +191,7 @@ export const api = {
 
     const payload = await res.json().catch(() => null);
     if (!res.ok) {
-      const message = payload?.error?.message || res.statusText || 'ID card upload failed';
+      const message = payload?.error?.message || payload?.message || res.statusText || 'ID card upload failed';
       throw new Error(message);
     }
     return payload?.data;
@@ -218,7 +218,7 @@ export const api = {
 
     const payload = await res.json().catch(() => null);
     if (!res.ok) {
-      const message = payload?.error?.message || res.statusText || 'Resume parsing failed';
+      const message = payload?.error?.message || payload?.message || res.statusText || 'Resume parsing failed';
       throw new Error(message);
     }
     return payload?.data;

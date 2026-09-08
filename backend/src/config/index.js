@@ -87,6 +87,7 @@ const baseConfig = {
     cors: {
       origin: buildCorsOriginMatcher({ origins: corsOrigins, allowNetlifyPreviews }),
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'X-Internal-Key', 'x-n8n-internal-key', 'x-n8n-key'],
       credentials: true,
     },
     rateLimit: {
