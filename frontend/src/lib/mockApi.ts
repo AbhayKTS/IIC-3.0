@@ -6,7 +6,7 @@ import type {
 import { auth } from './firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? '/api/v1' : 'http://localhost:4000/api/v1');
+const API_BASE = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api/v1' : 'http://localhost:4000/api/v1');
 
 const request = async <T>(path: string, options: { method?: string; body?: any; auth?: boolean } = {}): Promise<T> => {
   const { method = 'GET', body, auth: withAuth = false } = options;
@@ -22,12 +22,17 @@ const request = async <T>(path: string, options: { method?: string; body?: any; 
     body: body ? JSON.stringify(body) : undefined,
   });
 
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/json') && !res.ok) {
+    throw new Error(`API returned error ${res.status}: ${res.statusText}`);
+  }
+
   const payload = await res.json().catch(() => null);
   if (!res.ok) {
-    const message = payload?.error?.message || res.statusText || 'Request failed';
+    const message = payload?.error?.message || payload?.message || res.statusText || 'Request failed';
     throw new Error(message);
   }
-  return payload?.data as T;
+  return (payload?.data !== undefined ? payload.data : payload) as T;
 };
 
 const getProfileByEmail = async (email: string, role: string) => {
