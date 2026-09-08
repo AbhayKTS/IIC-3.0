@@ -133,11 +133,23 @@ const parseIdModelFields = (analyzeResult) => {
     getFieldValue(fields.ExpirationDate) ||
     null;
 
-  const collegeName =
+  const rawText = analyzeResult?.content || '';
+  rawFields.rawText = rawText;
+
+  let collegeName =
     getFieldValue(fields.Issuer) ||
     getFieldValue(fields.Organization) ||
     getFieldValue(fields.IssuingAuthority) ||
     null;
+
+  if (!collegeName && rawText) {
+    if (/GLA\s+University/i.test(rawText) || /\bGLA\b/i.test(rawText)) {
+      collegeName = 'GLA University';
+    } else {
+      const match = rawText.match(/([A-Za-z\s&.]+(?:University|College|Institute|Campus|Vidyapeeth|IIT|NIT|BITS|DTU)[^\n,]*)/i);
+      if (match && match[1]) collegeName = match[1].trim();
+    }
+  }
 
   const avgConfidence = confidences.length
     ? Number((confidences.reduce((a, b) => a + b, 0) / confidences.length).toFixed(3))

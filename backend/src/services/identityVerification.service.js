@@ -169,12 +169,24 @@ const detectDocumentType = (ocrResult, rawText = '') => {
  */
 const matchInstitution = (extractedCollegeName, registeredCollegeName, domain, rawText = '') => {
   const normRaw = normalizeText(rawText);
+  const normExtracted = normalizeText(extractedCollegeName);
 
-  // 1. Check rawText directly if available
-  if (registeredCollegeName && normRaw.includes(normalizeText(registeredCollegeName))) return true;
+  // 1. Check registeredCollegeName in rawText or extracted
+  if (registeredCollegeName) {
+    const normReg = normalizeText(registeredCollegeName);
+    if (normRaw.includes(normReg) || normExtracted.includes(normReg)) return true;
+
+    // Check significant college keywords like "gla"
+    const regKeywords = normReg.split(' ').filter((w) => w.length >= 3 && !['and', 'the', 'for', 'university', 'college', 'institute'].includes(w));
+    for (const kw of regKeywords) {
+      if (normRaw.includes(kw) || normExtracted.includes(kw)) return true;
+    }
+  }
+
+  // 2. Check domain abbreviation / keyword (e.g. "gla" from "gla.ac.in")
   if (domain) {
     const domainPart = domain.split('.')[0].toLowerCase();
-    if (domainPart.length >= 3 && normRaw.includes(domainPart)) return true;
+    if (domainPart.length >= 3 && (normRaw.includes(domainPart) || normExtracted.includes(domainPart))) return true;
   }
 
   if (!extractedCollegeName || !registeredCollegeName) return false;
