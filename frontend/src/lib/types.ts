@@ -160,3 +160,29 @@ export interface ShortlistEntry {
 export interface Session {
   role: UserRole; userId: string; token: string;
 }
+
+export interface JobRecommendation {
+  studentId: string;
+  jobId: string;
+  title: string;
+  company: string;
+  location?: string;
+  jobType?: string;
+  matchScore: number;
+  matchingSkills: string[];
+  reason: string;
+  updatedAt?: string;
+}
+
+export interface AppNotification {
+  id?: string;
+  notificationId?: string;
+  userId: string;
+  type: string;
+  title: string;
+  message: string;
+  referenceId?: string;
+  matchScore?: number;
+  isRead: boolean;
+  createdAt: string;
+}

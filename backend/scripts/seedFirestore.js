@@ -117,6 +117,48 @@ const seedSbts = [
   { id: 'sbt1', studentId: 's1', title: 'Verified Student Identity', reason: 'Identity verified by IIT Delhi administration', issuedBy: 'IIT Delhi', date: '2025-08-15', txHash: '0x7a3b...e4f1' },
 ];
 
+const seedJobs = [
+  {
+    id: 'job_react_swe',
+    companyId: 'Google India',
+    title: 'Frontend Developer Intern',
+    description: 'Work on cutting-edge React web applications and interactive UI components.',
+    jobType: 'internship',
+    eligibleColleges: 'all',
+    minimumScore: 60,
+    requiredSkills: ['React', 'JavaScript', 'TypeScript', 'HTML/CSS', 'TailwindCSS'],
+    status: 'open',
+    location: 'Bangalore / Hybrid',
+    applicationDeadline: '2026-05-30',
+  },
+  {
+    id: 'job_fullstack_dev',
+    companyId: 'TechCorp',
+    title: 'Full Stack Engineer',
+    description: 'Build backend APIs with Node.js and client applications in React and Next.js.',
+    jobType: 'fulltime',
+    eligibleColleges: 'all',
+    minimumScore: 70,
+    requiredSkills: ['Node.js', 'Express', 'React', 'MongoDB', 'Python'],
+    status: 'open',
+    location: 'Gurgaon / Remote',
+    applicationDeadline: '2026-06-15',
+  },
+  {
+    id: 'job_ai_engineer',
+    companyId: 'InnovateLabs',
+    title: 'AI & Data Science Associate',
+    description: 'Develop and integrate machine learning pipelines with Python and Cloud AI.',
+    jobType: 'fulltime',
+    eligibleColleges: 'all',
+    minimumScore: 65,
+    requiredSkills: ['Python', 'Machine Learning', 'Data Analysis', 'SQL', 'FastAPI'],
+    status: 'open',
+    location: 'Noida / Hybrid',
+    applicationDeadline: '2026-07-01',
+  },
+];
+
 const upsertCollection = async (collection, rows) => {
   const batch = db.batch();
   rows.forEach((row) => {
@@ -142,6 +184,7 @@ const run = async () => {
   await upsertCollection('faculty', seedFaculty);
   await upsertCollection('recruiters', seedRecruiters);
   await upsertCollection('gigs', seedGigs);
+  await upsertCollection('jobs', seedJobs);
   await upsertCollection('marketplace', seedMarketplace);
   await upsertCollection('communities', seedCommunities);
   await upsertCollection('clubs', seedClubs);

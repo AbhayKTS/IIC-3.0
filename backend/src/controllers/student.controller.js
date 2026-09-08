@@ -9,6 +9,8 @@ const { parseResumeData } = require('../services/resumeParser.service');
 const { logAudit } = require('../services/audit.service');
 const { Roles } = require('../utils/roles');
 const { triggerN8nWorkflow } = require('../services/n8n.service');
+const { matchJobsForStudent } = require('../services/jobMatching.service');
+const logger = require('../utils/logger');
 
 const PROFILE_LIMITS = {
   skills: 30,
@@ -47,12 +49,89 @@ const buildSearchableSkills = (skills) => {
   return skills.map((skill) => String(skill).trim().toLowerCase()).filter(Boolean);
 };
 
-const getStudentOverview = (req, res) => {
-  return ok(res, {
-    uid: req.userProfile.uid,
-    role: req.userProfile.role,
-    verificationStatus: req.userProfile.verificationStatus,
-  });
+const calculateProfileCompletion = (userDoc, profileDoc) => {
+  const checks = [
+    { field: 'Full Name', valid: Boolean(userDoc?.name || profileDoc?.name) },
+    { field: 'College Email', valid: Boolean(userDoc?.email) },
+    { field: 'Institution', valid: Boolean(userDoc?.collegeId) },
+    { field: 'Department / Branch', valid: Boolean(profileDoc?.branch) },
+    { field: 'Skills', valid: Boolean((userDoc?.skills?.length || profileDoc?.skills?.length || 0) > 0) },
+    { field: 'Resume Uploaded', valid: Boolean(userDoc?.resumeExtraction || profileDoc?.resumeExtraction) },
+    { field: 'College ID Verified', valid: Boolean(userDoc?.idVerification?.status === 'verified' || userDoc?.verificationStatus === 'verified') },
+    { field: 'Bio / Summary', valid: Boolean(profileDoc?.bio) },
+    { field: 'LinkedIn Profile', valid: Boolean(profileDoc?.codingProfiles?.linkedin || profileDoc?.linkedin) },
+    { field: 'GitHub / Projects', valid: Boolean(profileDoc?.codingProfiles?.github || (profileDoc?.projects && profileDoc.projects.length > 0)) },
+  ];
+
+  const completed = checks.filter((c) => c.valid).length;
+  const percentage = Math.round((completed / checks.length) * 100);
+  const missing = checks.filter((c) => !c.valid).map((c) => c.field);
+
+  return { percentage, missing };
+};
+
+const getStudentOverview = async (req, res, next) => {
+  try {
+    const actor = req.userProfile;
+
+    // College details
+    let college = null;
+    if (actor.collegeId) {
+      const colSnap = await db.collection('colleges').doc(actor.collegeId).get();
+      if (colSnap.exists) {
+        college = { id: colSnap.id, ...colSnap.data() };
+      }
+    }
+
+    // Profile details
+    const profileSnap = await db.collection('studentProfiles').doc(actor.uid).get();
+    const profile = profileSnap.exists ? normalizeStudentProfile(profileSnap.data()) : null;
+
+    // Profile completion calculation
+    const completion = calculateProfileCompletion(actor, profile);
+
+    // Notifications (latest 10)
+    const notifSnap = await db
+      .collection('notifications')
+      .where('userId', '==', actor.uid)
+      .limit(10)
+      .get();
+    const notifications = notifSnap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+    // Recommendations (latest 10)
+    let recSnap = await db
+      .collection('jobRecommendations')
+      .where('studentId', '==', actor.uid)
+      .limit(10)
+      .get();
+
+    let recommendations = recSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+    // If no recommendations exist yet, calculate initial matches
+    if (recommendations.length === 0 && ((actor.skills && actor.skills.length > 0) || (profile && profile.skills && profile.skills.length > 0))) {
+      recommendations = await matchJobsForStudent(actor.uid);
+    }
+
+    return ok(res, {
+      uid: actor.uid,
+      role: actor.role,
+      user: actor,
+      college,
+      profile,
+      profileCompletion: completion.percentage,
+      missingFields: completion.missing,
+      verificationStatus: actor.verificationStatus || 'unverified',
+      idVerification: actor.idVerification || null,
+      resumeExtraction: actor.resumeExtraction || null,
+      skills: actor.skills || profile?.skills || [],
+      notifications,
+      recommendations,
+    });
+  } catch (error) {
+    return next(error);
+  }
 };
 
 const getStudentProfile = async (req, res, next) => {
@@ -353,15 +432,15 @@ const parseResume = async (req, res, next) => {
       },
     });
 
+    // Automatically compute real job matches for the updated skills
+    await matchJobsForStudent(actor.uid).catch((err) => {
+      logger.warn(`[parseResume] In-engine job matching failed for ${actor.uid}: ${err.message}`);
+    });
+
     // Trigger n8n workflow for resume parsing and job matching (non-blocking)
-    triggerN8nWorkflow('resume_parsed', {
+    triggerN8nWorkflow('student.profile.updated', {
       studentId: actor.uid,
       collegeId: actor.collegeId || null,
-      skills: mergedSkills,
-      extractedSkills: extractedSkillNames,
-      candidateName: parsedData.candidateName || null,
-      email: parsedData.email || actor.email || null,
-      method: parsedData.method,
       timestamp: now,
     }).catch(() => undefined);
 

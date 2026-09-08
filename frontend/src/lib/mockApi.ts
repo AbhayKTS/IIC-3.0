@@ -1,7 +1,8 @@
 import type {
   College, Institution, Student, Faculty, Recruiter, Gig, GigApplication,
   MarketplaceItem, WalletSBT, Community, Club, Event, Team,
-  Placement, Notice, ChatMessage, Competition, ShortlistEntry, Session, IdVerificationData, ResumeExtractionData
+  Placement, Notice, ChatMessage, Competition, ShortlistEntry, Session, IdVerificationData, ResumeExtractionData,
+  JobRecommendation, AppNotification
 } from './types';
 import { auth } from './firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
@@ -123,6 +124,24 @@ export const api = {
   },
   async getVerifiedStudents(): Promise<Student[]> {
     return request('/compat/students/verified');
+  },
+
+  async getStudentOverview(): Promise<{
+    uid: string;
+    role: string;
+    user: any;
+    college: College | null;
+    profile: any;
+    profileCompletion: number;
+    missingFields: string[];
+    verificationStatus: 'unverified' | 'pending' | 'verified' | 'rejected';
+    idVerification: IdVerificationData | null;
+    resumeExtraction: ResumeExtractionData | null;
+    skills: string[];
+    notifications: AppNotification[];
+    recommendations: JobRecommendation[];
+  }> {
+    return request('/student/me', { auth: true });
   },
 
   // Verification

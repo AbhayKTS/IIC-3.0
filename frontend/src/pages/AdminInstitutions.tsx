@@ -40,10 +40,22 @@ import {
   ArrowUpRight,
 } from 'lucide-react';
 
+import { useAuth } from '@/lib/auth';
+import { useNavigate } from 'react-router-dom';
+
 export default function AdminInstitutions() {
+  const { session } = useAuth();
+  const navigate = useNavigate();
   const [institutions, setInstitutions] = useState<Institution[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (session?.role === 'student') {
+      toast.error('Access denied. Administrator privileges required.');
+      navigate('/student/dashboard', { replace: true });
+    }
+  }, [session, navigate]);
 
   // Add Institution Modal State
   const [isAddOpen, setIsAddOpen] = useState(false);
