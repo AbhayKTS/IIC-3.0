@@ -145,7 +145,16 @@ export default function StudentDashboard() {
   // ID Card Camera Scan — called when CameraIdScanner returns a result
   const handleIdVerified = (result: any) => {
     setIdResult(result);
-    toast.success('ID card scanned successfully! Submitted for faculty review.');
+    const status = result?.status;
+    if (status === 'VERIFIED') {
+      toast.success('Identity verified! Your college ID has been successfully validated.');
+    } else if (status === 'REQUIRES_REVIEW') {
+      toast('ID submitted for faculty review. You will be notified once reviewed.', { icon: '⏳' });
+    } else if (status === 'FAILED') {
+      toast.error(result?.reasonMessage || 'Verification failed. Please scan your college ID card.');
+    } else {
+      toast('ID card processed.');
+    }
     // Refresh dashboard data in background
     fetchDashboardData().catch(() => null);
   };
@@ -381,18 +390,50 @@ export default function StudentDashboard() {
               <div className="glass-card p-6 rounded-xl border border-border space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold text-foreground text-base flex items-center gap-2">
-                    <UserCheck className="h-5 w-5 text-primary" /> ID Card OCR Information
+                    <UserCheck className="h-5 w-5 text-primary" /> College ID Verification
                   </h3>
-                  {overview?.idVerification?.confidence !== undefined && (
-                    <Badge variant="outline" className="text-xs">
-                      Confidence: {Math.round(overview.idVerification.confidence * 100)}%
+                  {overview?.idVerification?.status && (
+                    <Badge
+                      variant="outline"
+                      className={`text-xs ${
+                        overview.idVerification.status === 'VERIFIED'
+                          ? 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400'
+                          : overview.idVerification.status === 'REQUIRES_REVIEW'
+                          ? 'border-amber-500/40 text-amber-600 dark:text-amber-400'
+                          : overview.idVerification.status === 'FAILED'
+                          ? 'border-destructive/40 text-destructive'
+                          : ''
+                      }`}
+                    >
+                      {overview.idVerification.status.replace('_', ' ')}
                     </Badge>
                   )}
                 </div>
 
                 {overview?.idVerification ? (
-                  <div className="space-y-3 bg-secondary/30 p-4 rounded-lg text-sm">
-                    <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="space-y-3">
+                    {/* Status Banner */}
+                    {overview.idVerification.status === 'VERIFIED' && (
+                      <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+                        <span>Identity verified: institution, name, and enrollment matched.</span>
+                      </div>
+                    )}
+                    {overview.idVerification.status === 'REQUIRES_REVIEW' && (
+                      <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                        <span>{overview.idVerification.reasonMessage || 'Submitted for faculty review.'}</span>
+                      </div>
+                    )}
+                    {overview.idVerification.status === 'FAILED' && (
+                      <div className="p-2.5 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs flex items-center gap-2">
+                        <XCircle className="h-4 w-4 flex-shrink-0" />
+                        <span>{overview.idVerification.reasonMessage || 'Verification failed. Please try again.'}</span>
+                      </div>
+                    )}
+
+                    {/* Extracted Data */}
+                    <div className="bg-secondary/30 p-3 rounded-lg grid grid-cols-2 gap-2 text-xs">
                       <div>
                         <span className="text-muted-foreground block">Extracted Name</span>
                         <span className="font-medium text-foreground">
@@ -418,13 +459,6 @@ export default function StudentDashboard() {
                         </span>
                       </div>
                     </div>
-
-                    {overview.idVerification.collegeMatch?.mismatchFlagged && (
-                      <div className="p-2.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs flex items-center gap-2">
-                        <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                        <span>Institution name on card requires manual faculty review.</span>
-                      </div>
-                    )}
                   </div>
                 ) : (
                   <div className="text-center py-6 border border-dashed border-border rounded-lg space-y-3">
@@ -432,12 +466,16 @@ export default function StudentDashboard() {
                       <Camera className="h-6 w-6 text-primary" />
                     </div>
                     <p className="text-sm text-muted-foreground">ID card not yet verified</p>
+                    <p className="text-xs text-muted-foreground px-4">
+                      Scan your physical college ID to verify your identity
+                    </p>
                     <Button size="sm" onClick={() => setIsIdModalOpen(true)} className="gap-2">
                       <Camera className="h-4 w-4" /> Scan College ID
                     </Button>
                   </div>
                 )}
               </div>
+
 
               {/* Resume + AI Analysis */}
               <div className="glass-card p-6 rounded-xl border border-border space-y-4">

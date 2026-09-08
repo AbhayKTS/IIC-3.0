@@ -45,7 +45,7 @@ async function matchJobsForStudent(studentId) {
       const job = { id: doc.id, ...doc.data() };
       const requiredSkills = Array.isArray(job.requiredSkills) ? job.requiredSkills : [];
 
-      let matchScore = 50; // Base score if no specific required skills
+      let matchScore = 0;
       let matchingSkills = [];
 
       if (requiredSkills.length > 0) {
@@ -54,7 +54,8 @@ async function matchJobsForStudent(studentId) {
         );
         matchScore = Math.round((matchingSkills.length / requiredSkills.length) * 100);
       } else if (studentSkillsLower.size > 0) {
-        matchScore = 65;
+        // Job has no specific requirements — generally relevant if student has skills
+        matchScore = 50;
       }
 
       // Only recommend jobs with at least 30% match

@@ -60,7 +60,7 @@ const envDefaults = {
     requireEmailVerification: true,
   },
   production: {
-    corsOrigin: 'https://collegeverse1.netlify.app,https://collegeverse.in',
+    corsOrigin: 'https://almadox.web.app,https://almadox.firebaseapp.com',
     rateLimitMax: 100,
     logLevel: 'info',
     requireEmailVerification: false,

@@ -20,7 +20,12 @@ export interface Institution {
 }
 
 export interface IdVerificationData {
-  status: 'pending_review' | 'verified' | 'rejected';
+  /** Backend status — new engine uses uppercase; legacy uses lowercase */
+  status: 'VERIFIED' | 'REQUIRES_REVIEW' | 'FAILED' | 'pending_review' | 'verified' | 'rejected';
+  reason?: string;
+  reasonMessage?: string;
+  matchedFields?: string[];
+  failedFields?: string[];
   extractedData?: {
     studentName?: string | null;
     rollNumber?: string | null;
@@ -37,6 +42,9 @@ export interface IdVerificationData {
   };
   source?: string;
   submittedAt?: string;
+  verifiedAt?: string | null;
+  verificationMethod?: string;
+  verificationVersion?: number;
   reviewedBy?: string | null;
   reviewedAt?: string | null;
 }

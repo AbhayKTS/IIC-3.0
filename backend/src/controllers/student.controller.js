@@ -5,6 +5,7 @@ const { clampArray, isValidUrl } = require('../utils/validation');
 const { incrementPlatformStats, incrementCollegeStats } = require('../services/stats.service');
 const { normalizeStudentProfile } = require('../utils/schema');
 const { extractIdCardData, extractTextFromDocument } = require('../services/ocr.service');
+const { verifyStudentIdentity } = require('../services/identityVerification.service');
 const { parseResumeData } = require('../services/resumeParser.service');
 const { logAudit } = require('../services/audit.service');
 const { Roles } = require('../utils/roles');
@@ -259,31 +260,6 @@ const updateStudentProfile = async (req, res, next) => {
   }
 };
 
-const fuzzyMatchCollege = (extracted, actual) => {
-  if (!extracted || !actual) return false;
-  const clean = (s) => s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
-  const c1 = clean(extracted);
-  const c2 = clean(actual);
-
-  if (c1.includes(c2) || c2.includes(c1)) return true;
-
-  // Acronym check: e.g. "iit delhi" vs "indian institute of technology delhi"
-  const getAcronym = (s) => s.split(' ').filter((w) => !['of', 'and', 'the', 'in'].includes(w)).map((w) => w[0]).join('');
-  const a1 = getAcronym(c1);
-  const a2 = getAcronym(c2);
-  if (a1 && (c2.includes(a1) || a2.includes(a1) || a1.includes(a2))) return true;
-
-  // Word token overlap
-  const stopWords = ['and', 'the', 'for', 'college', 'institute', 'technology', 'university', 'of', 'in'];
-  const words1 = new Set(c1.split(' ').filter((w) => w.length > 2 && !stopWords.includes(w)));
-  const words2 = new Set(c2.split(' ').filter((w) => w.length > 2 && !stopWords.includes(w)));
-  let matches = 0;
-  words1.forEach((w) => {
-    if (words2.has(w)) matches += 1;
-  });
-  return matches > 0;
-};
-
 const verifyIdCard = async (req, res, next) => {
   try {
     const actor = req.userProfile;
@@ -295,80 +271,156 @@ const verifyIdCard = async (req, res, next) => {
       throw new CustomError('ID card image file is required', 400, 'file_required');
     }
 
+    // ── Step 1: OCR ──────────────────────────────────────────────────────────
     const ocrResult = await extractIdCardData(req.file.buffer, req.file.mimetype);
 
-    // Fetch student's assigned college to verify college name match
-    let actualCollegeName = 'GLA University';
-    let isCollegeMatched = false;
+    if (!ocrResult.success) {
+      // OCR itself failed (Azure unavailable, buffer invalid, etc.)
+      const idVerification = {
+        status: 'FAILED',
+        reason: 'ocr_failed',
+        reasonMessage: 'Unable to read the document. Please ensure good lighting and try again.',
+        matchedFields: [],
+        failedFields: ['ocr'],
+        extractedData: null,
+        submittedAt: new Date().toISOString(),
+        verificationVersion: 2,
+      };
+      await db.collection('users').doc(actor.uid).set(
+        { idVerification, updatedAt: new Date().toISOString() },
+        { merge: true }
+      ).catch((e) => logger.warn('[verifyIdCard] Firestore write:', e.message));
+      return ok(res, { idVerification, message: 'OCR failed — please retry' });
+    }
 
+    // ── Step 2–5: Identity Verification Engine ───────────────────────────────
+    // Fetch the student's college for institution matching
+    let college = null;
     if (actor.collegeId) {
       try {
         const collegeSnap = await db.collection('colleges').doc(actor.collegeId).get();
         if (collegeSnap.exists) {
-          actualCollegeName = collegeSnap.data()?.name || actualCollegeName;
+          college = { id: collegeSnap.id, ...collegeSnap.data() };
         }
       } catch (err) {
         logger.warn('[verifyIdCard] College fetch warning:', err.message);
       }
     }
-
-    if (actualCollegeName && ocrResult.collegeName) {
-      isCollegeMatched = fuzzyMatchCollege(ocrResult.collegeName, actualCollegeName);
+    // Known institution fallback (matches middleware)
+    if (!college && (actor.collegeId === 'c_gla' || (actor.email && actor.email.includes('gla.ac.in')))) {
+      college = { id: 'c_gla', name: 'GLA University', domain: 'gla.ac.in', isActive: true };
     }
 
+    const verificationResult = verifyStudentIdentity(ocrResult, actor, college);
+
+    const now = new Date().toISOString();
+    const finalStatus = verificationResult.status; // 'VERIFIED' | 'REQUIRES_REVIEW' | 'FAILED'
+
+    // ── Build full idVerification document ────────────────────────────────────
     const idVerification = {
-      status: 'pending_review',
+      status: finalStatus,
+      reason: verificationResult.reason,
+      reasonMessage: verificationResult.reasonMessage,
+      matchedFields: verificationResult.matchedFields,
+      failedFields: verificationResult.failedFields,
       extractedData: {
         studentName: ocrResult.studentName || null,
         rollNumber: ocrResult.rollNumber || null,
         collegeName: ocrResult.collegeName || null,
         validUntil: ocrResult.validUntil || null,
-        rawFields: ocrResult.rawFields || {},
       },
       confidence: typeof ocrResult.confidence === 'number' ? ocrResult.confidence : 0,
       collegeMatch: {
-        matched: isCollegeMatched,
+        matched: verificationResult.diagnostics.institutionMatched,
         extractedCollegeName: ocrResult.collegeName || null,
-        expectedCollegeName: actualCollegeName,
-        mismatchFlagged: !isCollegeMatched,
+        expectedCollegeName: college?.name || null,
       },
-      source: ocrResult.source || (ocrResult.reason ? `fallback:${ocrResult.reason}` : 'azure-docint'),
-      submittedAt: new Date().toISOString(),
+      source: ocrResult.source || 'azure-docint',
+      submittedAt: now,
+      verifiedAt: finalStatus === 'VERIFIED' ? now : null,
+      verificationMethod: 'college_email+live_id_scan',
+      verificationVersion: 2,
       reviewedBy: null,
       reviewedAt: null,
     };
 
+    // ── Persist to Firestore ──────────────────────────────────────────────────
+    const userUpdate = {
+      idVerification,
+      updatedAt: now,
+    };
+
+    // Only flip the top-level verificationStatus to 'verified' when FULLY matched
+    if (finalStatus === 'VERIFIED') {
+      userUpdate.verificationStatus = 'verified';
+      userUpdate.verifiedAt = now;
+    } else if (finalStatus === 'REQUIRES_REVIEW') {
+      // Don't downgrade if already verified; keep pending_review for new submissions
+      if (actor.verificationStatus !== 'verified') {
+        userUpdate.verificationStatus = 'pending_review';
+      }
+    } else {
+      // FAILED: explicitly mark so dashboard shows the right state
+      if (actor.verificationStatus !== 'verified') {
+        userUpdate.verificationStatus = 'unverified';
+      }
+    }
+
     try {
-      await db.collection('users').doc(actor.uid).set({
-        idVerification,
-        updatedAt: new Date().toISOString(),
-      }, { merge: true });
+      await db.collection('users').doc(actor.uid).set(userUpdate, { merge: true });
     } catch (err) {
       logger.warn('[verifyIdCard] Firestore user update warning:', err.message);
     }
 
+    // ── Audit log ─────────────────────────────────────────────────────────────
     try {
       await logAudit({
-        actionType: 'id_card_ocr_submitted',
+        actionType: 'id_card_verification_attempt',
         performedBy: actor.uid,
         performedByRole: actor.role || 'student',
         targetId: actor.uid,
         targetType: 'user',
         collegeId: actor.collegeId || null,
         metadata: {
-          confidence: idVerification.confidence,
-          ocrSuccess: ocrResult.success,
-          collegeMatched: isCollegeMatched,
-          source: idVerification.source,
+          status: finalStatus,
+          reason: verificationResult.reason,
+          matchedFields: verificationResult.matchedFields,
+          failedFields: verificationResult.failedFields,
+          documentType: verificationResult.diagnostics.documentType,
+          institutionMatched: verificationResult.diagnostics.institutionMatched,
+          nameMatched: verificationResult.diagnostics.nameMatched,
+          enrollmentMatch: verificationResult.diagnostics.enrollmentMatch,
+          ocrConfidence: idVerification.confidence,
+          ocrSource: idVerification.source,
         },
       });
     } catch (err) {
       logger.warn('[verifyIdCard] Audit log warning:', err.message);
     }
 
+    // ── Trigger n8n on VERIFIED (non-blocking) ────────────────────────────────
+    if (finalStatus === 'VERIFIED') {
+      triggerN8nWorkflow('student.verified', {
+        studentId: actor.uid,
+        collegeId: actor.collegeId || null,
+        timestamp: now,
+      }).catch(() => undefined);
+
+      // Also kick off job matching for newly verified student
+      matchJobsForStudent(actor.uid).catch((err) =>
+        logger.warn(`[verifyIdCard] Job matching after verification failed: ${err.message}`)
+      );
+    }
+
+    const statusMessages = {
+      VERIFIED: 'Identity verified successfully',
+      REQUIRES_REVIEW: 'ID submitted for faculty review',
+      FAILED: verificationResult.reasonMessage || 'Verification failed',
+    };
+
     return ok(res, {
       idVerification,
-      message: 'ID card submitted for faculty verification',
+      message: statusMessages[finalStatus] || 'ID card processed',
     });
   } catch (error) {
     logger.error('[verifyIdCard] Error in verifyIdCard:', error);
