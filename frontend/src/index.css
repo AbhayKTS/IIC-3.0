@@ -1,8 +1,8 @@
 /* ─────────────────────────────────────────────────────────────────────────
    Almadox — Design System
-   Inter (body) + JetBrains Mono (headings / labels / stats)
+   Inter (body) + Fraunces (display headings) + JetBrains Mono (labels/stats)
    ───────────────────────────────────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,600&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -12,37 +12,53 @@
 @layer base {
   :root {
     --radius: 0.75rem;
-    --background: oklch(0.975 0.018 76.6);
-    --foreground: oklch(0.145 0.015 76.6);
-    --card: oklch(0.985 0.01 76.6);
-    --card-foreground: oklch(0.145 0.015 76.6);
-    --popover: oklch(0.985 0.01 76.6);
-    --popover-foreground: oklch(0.145 0.015 76.6);
-    --primary: oklch(0.56 0.13 46.5);
+
+    /* Warm parchment base — slightly richer contrast than before */
+    --background: oklch(0.972 0.018 76.6);
+    --foreground: oklch(0.13 0.018 72.0);
+
+    /* Card / surface — layered depth */
+    --card: oklch(0.982 0.012 76.6);
+    --card-foreground: oklch(0.13 0.018 72.0);
+    --surface: oklch(0.965 0.02 77.0);
+
+    --popover: oklch(0.982 0.012 76.6);
+    --popover-foreground: oklch(0.13 0.018 72.0);
+
+    /* Primary: vibrant warm amber-brown — more chroma, same hue */
+    --primary: oklch(0.58 0.155 46.5);
     --primary-foreground: oklch(0.985 0.01 76.6);
+
     --secondary: oklch(0.925 0.04 77.4);
-    --secondary-foreground: oklch(0.145 0.015 76.6);
+    --secondary-foreground: oklch(0.13 0.018 72.0);
+
     --muted: oklch(0.925 0.04 77.4);
-    --muted-foreground: oklch(0.556 0.02 76.6);
-    --accent: oklch(0.72 0.15 69.2);
-    --accent-foreground: oklch(0.145 0.015 76.6);
+    --muted-foreground: oklch(0.52 0.025 72.0);
+
+    /* Accent: richer gold */
+    --accent: oklch(0.74 0.165 69.2);
+    --accent-foreground: oklch(0.13 0.018 72.0);
+
     --destructive: oklch(0.577 0.245 27.325);
     --destructive-foreground: oklch(0.985 0.01 76.6);
-    --border: oklch(0.925 0.04 77.4);
-    --input: oklch(0.925 0.04 77.4);
-    --ring: oklch(0.56 0.13 46.5);
-    --sidebar: oklch(0.985 0.01 76.6);
-    --sidebar-foreground: oklch(0.145 0.015 76.6);
-    --sidebar-primary: oklch(0.56 0.13 46.5);
+
+    --border: oklch(0.91 0.035 77.4);
+    --input: oklch(0.91 0.035 77.4);
+    --ring: oklch(0.58 0.155 46.5);
+
+    --sidebar: oklch(0.982 0.012 76.6);
+    --sidebar-foreground: oklch(0.13 0.018 72.0);
+    --sidebar-primary: oklch(0.58 0.155 46.5);
     --sidebar-primary-foreground: oklch(0.985 0.01 76.6);
     --sidebar-accent: oklch(0.925 0.04 77.4);
-    --sidebar-accent-foreground: oklch(0.145 0.015 76.6);
-    --sidebar-border: oklch(0.925 0.04 77.4);
-    --sidebar-ring: oklch(0.56 0.13 46.5);
+    --sidebar-accent-foreground: oklch(0.13 0.018 72.0);
+    --sidebar-border: oklch(0.91 0.035 77.4);
+    --sidebar-ring: oklch(0.58 0.155 46.5);
 
-    /* Subtle depth shadow */
-    --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-    --shadow-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+    /* Elevation shadows */
+    --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+    --shadow-hover: 0 12px 28px -6px rgba(0, 0, 0, 0.1), 0 4px 8px -2px rgba(0, 0, 0, 0.05);
+    --shadow-glow: 0 0 24px color-mix(in oklab, var(--primary) 28%, transparent);
   }
 }
 
@@ -59,7 +75,6 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Body uses Inter for readability */
   body {
     @apply bg-background text-foreground antialiased;
     font-family: "Inter", system-ui, sans-serif;
@@ -67,21 +82,30 @@
     line-height: 1.6;
   }
 
-  /* Subtle dot-grid background — not the heavy scanline overlay */
   body::after {
     display: none;
   }
 
-  /* Fraunces for headings */
+  /* Fraunces for all headings — tighter tracking at display scale */
   h1, h2, h3, h4, h5, h6 {
     font-family: "Fraunces", serif;
-    line-height: 1.2;
-    letter-spacing: -0.01em;
+    line-height: 1.12;
+    letter-spacing: -0.02em;
   }
 
-  /* Focus rings — keyboard accessible */
+  /* Display-size h1 — extra tight */
+  h1 {
+    letter-spacing: -0.03em;
+    line-height: 1.05;
+  }
+
+  /* Body paragraphs — generous leading for readability */
+  p {
+    line-height: 1.75;
+  }
+
   :focus-visible {
-    outline: 2px solid var(--accent-raw);
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
     border-radius: 4px;
   }
@@ -100,7 +124,6 @@
   }
 
   /* ─── Buttons ─── */
-  /* Primary */
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full font-bold text-sm;
     font-family: "Inter", sans-serif;
@@ -108,8 +131,48 @@
     color: var(--primary-foreground);
     border: 1px solid var(--primary);
     transition: opacity 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+    /* Subtle inner glow edge */
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 2px 8px color-mix(in oklab, var(--primary) 22%, transparent);
   }
 
+  .btn-primary:hover {
+    opacity: 0.92;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 0 20px color-mix(in oklab, var(--primary) 36%, transparent), 0 4px 12px rgba(0,0,0,0.08);
+  }
+
+  .btn-primary:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full font-semibold text-sm;
+    font-family: "Inter", sans-serif;
+    background: color-mix(in oklab, var(--foreground) 3%, transparent);
+    color: var(--foreground);
+    border: 1px solid var(--border);
+    transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
+  }
+
+  .btn-ghost:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: color-mix(in oklab, var(--primary) 5%, transparent);
+  }
+
+  /* ─── Glassmorphism card ─── */
+  .glass-card {
+    background: color-mix(in oklab, var(--card) 85%, transparent);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(16px) saturate(1.4);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    box-shadow: 
+      0 4px 24px -8px rgba(0, 0, 0, 0.12),
+      0 1px 0 0 rgba(255, 255, 255, 0.25) inset,
+      0 -1px 0 0 rgba(0, 0, 0, 0.04) inset;
+  }
+
+  /* ─── Card base ─── */
   .almadox-card {
     background: var(--card);
     border: 1px solid var(--border);
@@ -125,36 +188,7 @@
     transform: translateY(-2px);
   }
 
-  .btn-primary:hover {
-    opacity: 0.9;
-    transform: translateY(-1px);
-    box-shadow: 0 0 16px color-mix(in oklab, var(--primary) 30%, transparent);
-  }
-
-  .btn-primary:focus-visible {
-    outline: 2px solid var(--primary);
-    outline-offset: 2px;
-  }
-
-  /* Ghost/secondary */
-  .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full font-semibold text-sm;
-    font-family: "Inter", sans-serif;
-    background: color-mix(in oklab, var(--foreground) 3%, transparent);
-    color: var(--foreground);
-    border: 1px solid var(--border);
-    transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
-  }
-
-  .btn-ghost:hover {
-    border-color: var(--primary);
-    color: var(--primary);
-    background: color-mix(in oklab, var(--primary) 5%, transparent);
-    transform: translateY(-1px);
-  }
-
   /* ─── Typography helpers ─── */
-  /* Mono label — uppercase, tracked, small — for section labels / tags */
   .mono-label {
     font-family: "JetBrains Mono", monospace;
     font-size: 0.6875rem;
@@ -163,24 +197,27 @@
     font-weight: 600;
   }
 
-  /* Stat number */
   .stat-num {
     font-family: "JetBrains Mono", monospace;
     font-weight: 700;
     letter-spacing: -0.02em;
   }
 
-  /* Accent text */
+  /* Display text helper */
+  .text-display {
+    font-family: "Fraunces", serif;
+    letter-spacing: -0.03em;
+    line-height: 1.05;
+  }
+
   .text-accent {
     color: var(--primary);
   }
 
-  /* Identity text */
   .text-identity {
     color: var(--primary);
   }
 
-  /* Section divider chip */
   .section-chip {
     @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full mono-label;
     background: color-mix(in oklab, var(--primary) 8%, transparent);
@@ -213,7 +250,7 @@
   }
 }
 
-/* ── Utility animations ──────────────────────────────────────────────────── */
+/* ── Utility animations & effects ────────────────────────────────────────── */
 @layer utilities {
   .animate-float {
     animation: float 6s ease-in-out infinite;
@@ -223,15 +260,32 @@
     animation: coin-rotate 10s linear infinite;
   }
 
+  /* ── Hero golden glow — 3-layer gradient + subtle noise overlay ── */
   .golden-glow {
+    position: relative;
     background:
-      radial-gradient(120% 90% at 82% 12%, color-mix(in oklab, var(--accent) 40%, transparent), transparent 55%),
-      radial-gradient(90% 70% at 8% 88%, color-mix(in oklab, var(--primary) 28%, transparent), transparent 55%),
+      radial-gradient(120% 90% at 82% 12%, color-mix(in oklab, var(--accent) 38%, transparent), transparent 55%),
+      radial-gradient(90% 70% at 8% 88%, color-mix(in oklab, var(--primary) 26%, transparent), transparent 55%),
+      radial-gradient(60% 50% at 50% 50%, color-mix(in oklab, var(--primary) 8%, transparent), transparent 70%),
       linear-gradient(160deg, var(--background) 0%, var(--secondary) 100%);
   }
 
+  /* Noise grain pseudo — z-index: -1 keeps it behind all children
+     without touching any child's position or z-index */
+  .golden-glow::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 180px 180px;
+  }
+
   .soft-shadow {
-    box-shadow: 0 30px 60px -30px color-mix(in oklab, var(--primary) 35%, transparent);
+    box-shadow: 0 30px 60px -30px color-mix(in oklab, var(--primary) 30%, transparent);
   }
 
   .network-grid {
@@ -242,6 +296,7 @@
   }
 }
 
+/* ── Keyframes ───────────────────────────────────────────────────────────── */
 @keyframes float {
   0%, 100% { transform: translateY(0); }
   50%       { transform: translateY(-8px); }
