@@ -14,3 +14,5 @@ service-account*.json
 *-firebase-adminsdk-*.json
 firebase,txt
 gha-key.json
+.vercel
+.env*
