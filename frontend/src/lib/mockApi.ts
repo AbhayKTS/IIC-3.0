@@ -4,8 +4,9 @@ import type {
   Placement, Notice, ChatMessage, Competition, ShortlistEntry, Session, IdVerificationData, ResumeExtractionData,
   JobRecommendation, AppNotification, CodingProfiles
 } from './types';
-import { auth } from './firebase';
+import { auth, db } from './firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const getApiBase = () => {
   const envUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL;
@@ -166,7 +167,20 @@ export const api = {
         if (bootstrap?.role) role = bootstrap.role;
       } catch (_) {}
 
-      const profile = await getProfileByEmail(email, role);
+      let profile = await getProfileByEmail(email, role);
+      
+      // Fallback: fetch from Firestore if backend returns nothing
+      if (!profile) {
+        try {
+          const docSnap = await getDoc(doc(db, 'users', credential.user.uid));
+          if (docSnap.exists()) {
+            profile = docSnap.data() as any;
+          }
+        } catch (e) {
+          console.warn("Firestore fetch failed:", e);
+        }
+      }
+
       if (!profile) {
         if (DEMO_ACCOUNTS[trimmedEmail]) {
           return {
@@ -655,18 +669,31 @@ export const api = {
     const cred = await createUserWithEmailAndPassword(auth, data.email, data.password);
     // 2. Create backend profile + roleOverrides
     const { password, ...profileData } = data;
-    await request('/compat/signup', { method: 'POST', body: profileData });
+    const fullProfile = { id: cred.user.uid, ...profileData };
+    
+    await request('/compat/signup', { method: 'POST', body: profileData }).catch(() => null);
+    
+    // 2.5 Save directly to Firestore for real-time frontend retrieval
+    try {
+      await setDoc(doc(db, 'users', cred.user.uid), fullProfile);
+    } catch (e) {
+      console.warn("Failed to write profile to Firestore", e);
+    }
+    
     // 3. Bootstrap session
     const bootstrap = await request<{ uid: string; role: string }>(
       '/auth/bootstrap',
       { method: 'POST', auth: true }
     ).catch(() => ({ uid: cred.user.uid, role: data.role }));
-    const profile = await getProfileByEmail(data.email, data.role).catch(() => null);
+    
+    let profile = await getProfileByEmail(data.email, data.role).catch(() => null);
+    if (!profile) profile = fullProfile; // Use the freshly saved profile if backend fails
+    
     return {
       role: data.role,
       userId: cred.user.uid,
       token: await cred.user.getIdToken(),
-      user: profile || { id: cred.user.uid, email: data.email, name: data.name, role: data.role },
+      user: profile,
     };
   },
 
