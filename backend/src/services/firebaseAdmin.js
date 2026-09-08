@@ -20,14 +20,14 @@ const initFirebaseAdmin = () => {
   const isRender = !!process.env.RENDER;
   const isVercel = !!process.env.VERCEL;
 
-  // Support GOOGLE_APPLICATION_CREDENTIALS_JSON env var (Render, etc.)
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON && !hasInlineCreds) {
+  // Support GOOGLE_APPLICATION_CREDENTIALS_JSON or FIREBASE_SERVICE_ACCOUNT_JSON env var (Vercel, Render, etc.)
+  const rawJsonCreds = process.env.FIREBASE_SERVICE_ACCOUNT_JSON || process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+  if (rawJsonCreds && !hasInlineCreds) {
     try {
-      const sa = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+      const sa = JSON.parse(rawJsonCreds);
       config.firebase.projectId = config.firebase.projectId || sa.project_id;
-      config.firebase.clientEmail = sa.client_email;
-      config.firebase.privateKey = sa.private_key;
-      // Clear serviceAccountPath so we use inline creds instead
+      config.firebase.clientEmail = config.firebase.clientEmail || sa.client_email;
+      config.firebase.privateKey = config.firebase.privateKey || sa.private_key;
       config.firebase.serviceAccountPath = '';
     } catch (_) { /* ignore parse errors */ }
   }
