@@ -28,6 +28,7 @@ app.use(helmet({
   },
 }));
 app.use(cors(config.security.cors));
+app.options('*', cors(config.security.cors));
 
 // Global rate limit keeps abuse from impacting shared infrastructure.
 const limiter = rateLimit({

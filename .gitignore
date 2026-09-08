@@ -6,6 +6,7 @@ logs/
 !.env.example
 !frontend/.env.production
 !backend/.env.example
+!backend/.env.production.example
 .firebase/
 frontend/dist/
 *.log
