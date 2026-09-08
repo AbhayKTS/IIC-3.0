@@ -14,12 +14,13 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import CameraIdScanner from '@/components/CameraIdScanner';
 import {
   CheckCircle2,
   Clock,
   XCircle,
   AlertCircle,
-  UploadCloud,
+  Camera,
   FileText,
   Sparkles,
   Briefcase,
@@ -30,7 +31,6 @@ import {
   Building2,
   Mail,
   RefreshCw,
-  ExternalLink,
   ChevronRight,
   UserCheck,
 } from 'lucide-react';
@@ -59,13 +59,9 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // ID Card Verification Modal State
+  // ID Card Camera Scan Modal State
   const [isIdModalOpen, setIsIdModalOpen] = useState(false);
-  const [idFile, setIdFile] = useState<File | null>(null);
-  const [idUploading, setIdUploading] = useState(false);
-  const [idError, setIdError] = useState<string | null>(null);
   const [idResult, setIdResult] = useState<IdVerificationData | null>(null);
-  const idFileInputRef = useRef<HTMLInputElement>(null);
 
   // Resume Upload Modal State
   const [isResumeModalOpen, setIsResumeModalOpen] = useState(false);
@@ -146,41 +142,12 @@ export default function StudentDashboard() {
     fetchDashboardData();
   }, [session]);
 
-  // ID Card Upload Handler
-  const handleIdFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error('ID card image must be under 5MB');
-        return;
-      }
-      setIdFile(file);
-      setIdError(null);
-    }
-  };
-
-  const handleUploadIdCard = async () => {
-    if (!idFile) {
-      toast.error('Please select an ID card image first');
-      return;
-    }
-
-    try {
-      setIdUploading(true);
-      setIdError(null);
-      const res = await api.uploadIdCard(idFile);
-      if (res?.idVerification) {
-        setIdResult(res.idVerification);
-        toast.success(res.message || 'ID Card submitted for verification successfully!');
-        await fetchDashboardData();
-      }
-    } catch (err: any) {
-      const msg = err?.message || 'ID Card verification failed. Please try again.';
-      setIdError(msg);
-      toast.error(msg);
-    } finally {
-      setIdUploading(false);
-    }
+  // ID Card Camera Scan — called when CameraIdScanner returns a result
+  const handleIdVerified = (result: any) => {
+    setIdResult(result);
+    toast.success('ID card scanned successfully! Submitted for faculty review.');
+    // Refresh dashboard data in background
+    fetchDashboardData().catch(() => null);
   };
 
   // Resume Upload Handler
@@ -306,7 +273,7 @@ export default function StudentDashboard() {
                 </Button>
                 {verificationStatus !== 'verified' && (
                   <Button onClick={() => setIsIdModalOpen(true)} className="gap-2 shadow-sm">
-                    <ShieldCheck className="h-4 w-4" /> Verify ID Card
+                    <Camera className="h-4 w-4" /> Scan ID Card
                   </Button>
                 )}
               </div>
@@ -395,10 +362,13 @@ export default function StudentDashboard() {
                 <div className="pt-2">
                   <Button
                     size="sm"
-                    className="w-full justify-between"
+                    className="w-full justify-between gap-2"
                     onClick={() => setIsIdModalOpen(true)}
                   >
-                    <span>{overview?.idVerification ? 'View ID Verification' : 'Verify College ID'}</span>
+                    <span className="flex items-center gap-2">
+                      <Camera className="h-4 w-4" />
+                      {overview?.idVerification ? 'Rescan College ID' : 'Scan College ID'}
+                    </span>
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
@@ -457,11 +427,13 @@ export default function StudentDashboard() {
                     )}
                   </div>
                 ) : (
-                  <div className="text-center py-6 border border-dashed border-border rounded-lg space-y-2">
-                    <UploadCloud className="h-8 w-8 text-muted-foreground mx-auto" />
-                    <p className="text-sm text-muted-foreground">No ID card uploaded yet</p>
-                    <Button size="sm" variant="outline" onClick={() => setIsIdModalOpen(true)}>
-                      Upload Student ID
+                  <div className="text-center py-6 border border-dashed border-border rounded-lg space-y-3">
+                    <div className="p-3 rounded-full bg-primary/10 w-fit mx-auto">
+                      <Camera className="h-6 w-6 text-primary" />
+                    </div>
+                    <p className="text-sm text-muted-foreground">ID card not yet verified</p>
+                    <Button size="sm" onClick={() => setIsIdModalOpen(true)} className="gap-2">
+                      <Camera className="h-4 w-4" /> Scan College ID
                     </Button>
                   </div>
                 )}
@@ -648,69 +620,29 @@ export default function StudentDashboard() {
         )}
       </div>
 
-      {/* ID CARD VERIFICATION MODAL */}
-      <Dialog open={isIdModalOpen} onOpenChange={setIsIdModalOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
+      {/* ID CARD CAMERA SCAN MODAL */}
+      <Dialog open={isIdModalOpen} onOpenChange={(open) => {
+        setIsIdModalOpen(open);
+      }}>
+        <DialogContent className="sm:max-w-[420px] p-6">
+          <DialogHeader className="mb-3">
             <DialogTitle className="flex items-center gap-2 text-foreground">
-              <ShieldCheck className="h-5 w-5 text-primary" /> Verify College ID Card
+              <Camera className="h-5 w-5 text-primary" /> Scan College ID Card
             </DialogTitle>
             <DialogDescription>
-              Upload an image of your student ID. Azure Document Intelligence will analyze the card and match it with your college profile.
+              Hold your physical college ID card in front of the camera. We'll capture and verify it — no file upload required.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 pt-2">
-            {idError && (
-              <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                <span>{idError}</span>
-              </div>
-            )}
-
-            <div
-              className="border-2 border-dashed border-border rounded-xl p-6 text-center cursor-pointer hover:border-primary/50 transition-colors"
-              onClick={() => idFileInputRef.current?.click()}
-            >
-              <input
-                ref={idFileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleIdFileSelect}
-              />
-              <UploadCloud className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
-              <p className="text-sm font-medium text-foreground">
-                {idFile ? idFile.name : 'Click to select ID card image'}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">PNG, JPG, or WebP up to 5MB</p>
-            </div>
-
-            {idResult && (
-              <div className="p-3.5 rounded-lg bg-secondary/40 border border-border text-xs space-y-1.5">
-                <div className="font-semibold text-foreground">Extracted ID Data:</div>
-                <div>Name: <span className="font-medium">{idResult.extractedData?.studentName || 'N/A'}</span></div>
-                <div>Roll #: <span className="font-medium">{idResult.extractedData?.rollNumber || 'N/A'}</span></div>
-                <div>Institution: <span className="font-medium">{idResult.extractedData?.collegeName || 'N/A'}</span></div>
-                <div>Match Status: <span className="font-medium">{idResult.collegeMatch?.matched ? '✓ College Matched' : 'Flagged for Review'}</span></div>
-              </div>
-            )}
-
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setIsIdModalOpen(false)}>
-                Close
-              </Button>
-              <Button onClick={handleUploadIdCard} disabled={idUploading || !idFile} className="gap-2">
-                {idUploading ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 animate-spin" /> Analyzing OCR...
-                  </>
-                ) : (
-                  'Upload & Verify'
-                )}
-              </Button>
-            </div>
-          </div>
+          <CameraIdScanner
+            onVerified={(result) => {
+              handleIdVerified(result);
+            }}
+            onClose={() => setIsIdModalOpen(false)}
+            studentName={studentName}
+            studentEmail={studentEmail}
+            collegeName={collegeName}
+          />
         </DialogContent>
       </Dialog>
 
