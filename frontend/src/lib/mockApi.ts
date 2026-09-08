@@ -7,7 +7,18 @@ import type {
 import { auth } from './firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api/v1' : 'http://localhost:4000/api/v1');
+const getApiBase = () => {
+  const envUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL;
+  if (envUrl && envUrl.startsWith('http')) {
+    return envUrl;
+  }
+  if (typeof window !== 'undefined' && window.location.hostname.includes('web.app')) {
+    return 'https://iic-3-0-ansh.vercel.app/api/v1';
+  }
+  return import.meta.env.PROD ? 'https://iic-3-0-ansh.vercel.app/api/v1' : 'http://localhost:4000/api/v1';
+};
+
+const API_BASE = getApiBase();
 
 const request = async <T>(path: string, options: { method?: string; body?: any; auth?: boolean } = {}): Promise<T> => {
   const { method = 'GET', body, auth: withAuth = false } = options;
@@ -24,8 +35,8 @@ const request = async <T>(path: string, options: { method?: string; body?: any; 
   });
 
   const contentType = res.headers.get('content-type') || '';
-  if (!contentType.includes('application/json') && !res.ok) {
-    throw new Error(`API returned error ${res.status}: ${res.statusText}`);
+  if (!contentType.includes('application/json')) {
+    throw new Error(`API endpoint unavailable (received ${contentType || 'HTML'} from server).`);
   }
 
   const payload = await res.json().catch(() => null);
