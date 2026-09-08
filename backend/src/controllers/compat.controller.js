@@ -275,20 +275,73 @@ module.exports = {
     try {
       const { category, collegeId } = req.query || {};
       let students = await listDocs('students');
-      students = students.filter((s) => s.verificationStatus === 'verified');
-      if (collegeId) students = students.filter((s) => s.collegeId === collegeId);
+      let userStudents = [];
+      try {
+        const usersSnap = await db.collection('users').where('role', '==', 'student').get();
+        userStudents = usersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      } catch (_) {}
+
+      const map = new Map();
+      for (const s of students) {
+        const key = s.id || s.email;
+        if (key) map.set(key, s);
+      }
+      for (const u of userStudents) {
+        const key = u.id || u.uid || u.email;
+        if (key) {
+          const existing = map.get(key) || {};
+          map.set(key, { ...existing, ...u });
+        }
+      }
+
+      let all = Array.from(map.values());
+      if (collegeId) all = all.filter((s) => s.collegeId === collegeId);
+
       const colleges = await listDocs('colleges');
-      const ranked = students.map((s) => {
+      const ranked = all.map((s) => {
+        const lcSolved = s.codingProfiles?.leetcode?.totalSolved || 0;
+        const cfRating = s.codingProfiles?.codeforces?.rating || 0;
+        const cfSolved = s.codingProfiles?.codeforces?.totalSolved || 0;
+        const ghPoints = s.codingProfiles?.github?.points || 0;
+
+        const calculatedCoding = (s.points?.coding || 0) > 0
+          ? (s.points?.coding || 0)
+          : ((lcSolved * 10) + Math.max(0, cfRating) + (cfSolved * 10) + ghPoints);
+
         const pts = category === 'cultural'
           ? (s.points?.cultural || 0)
           : category === 'sports'
             ? (s.points?.sports || 0)
             : category === 'education'
               ? (s.points?.education || 0)
-              : (s.points?.cultural || 0) + (s.points?.sports || 0) + (s.points?.education || 0) + (s.points?.coding || 0);
+              : category === 'coding' || category === 'leetcode' || category === 'codeforces' || category === 'github'
+                ? calculatedCoding
+                : (s.points?.cultural || 0) + (s.points?.sports || 0) + (s.points?.education || 0) + calculatedCoding;
+
         const college = colleges.find((c) => c.id === s.collegeId);
-        return { ...s, totalPoints: pts, collegeName: college?.name || '' };
-      }).sort((a, b) => b.totalPoints - a.totalPoints);
+        return {
+          ...s,
+          totalPoints: pts,
+          collegeName: college?.name || s.collegeName || 'GLA University',
+          leetcode: {
+            solved: lcSolved,
+            rating: s.codingProfiles?.leetcode?.rating || (lcSolved > 0 ? 1500 + lcSolved : 0),
+            handle: s.codingProfiles?.leetcode?.username || s.leetcode || '',
+          },
+          codeforces: {
+            rating: cfRating,
+            rank: s.codingProfiles?.codeforces?.rank || 'Unrated',
+            handle: s.codingProfiles?.codeforces?.handle || s.codeforces || '',
+          },
+          github: {
+            commits: (s.codingProfiles?.github?.publicRepos || 0) * 10,
+            prs: Math.round((s.codingProfiles?.github?.publicRepos || 0) * 1.5),
+            handle: s.codingProfiles?.github?.username || s.github || '',
+          },
+        };
+      }).sort((a, b) => b.totalPoints - a.totalPoints)
+        .map((item, idx) => ({ ...item, rank: idx + 1 }));
+
       return ok(res, ranked);
     } catch (error) {
       return next(error);

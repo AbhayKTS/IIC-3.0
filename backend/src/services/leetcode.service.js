@@ -39,6 +39,20 @@ query getUserProfile($username: String!) {
 `;
 
 /**
+ * Cleans user-entered handles or full profile URLs to extract raw LeetCode username.
+ * @param {string} username
+ * @returns {string}
+ */
+function cleanLeetCodeUsername(username) {
+  if (typeof username !== 'string') return '';
+  return username
+    .trim()
+    .replace(/^https?:\/\/(?:www\.)?leetcode\.com\/(?:u\/)?/i, '')
+    .replace(/^\/+|\/+$/g, '')
+    .replace(/^@/, '');
+}
+
+/**
  * Validates whether a LeetCode username conforms to public profile username rules.
  * @param {string} username
  * @returns {boolean}
@@ -200,6 +214,7 @@ async function fetchLeetCodeProfile(username) {
 }
 
 module.exports = {
+  cleanLeetCodeUsername,
   isValidLeetCodeUsername,
   fetchLeetCodeProfile,
   normalizeLeetCodeData,

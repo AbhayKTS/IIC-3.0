@@ -1,7 +1,8 @@
 const CustomError = require('../utils/CustomError');
 const { ok } = require('../utils/response');
-const { isValidLeetCodeUsername } = require('../services/leetcode.service');
-const { isValidCodeforcesHandle } = require('../services/codeforces.service');
+const { isValidLeetCodeUsername, cleanLeetCodeUsername } = require('../services/leetcode.service');
+const { isValidCodeforcesHandle, cleanCodeforcesHandle } = require('../services/codeforces.service');
+const { isValidGithubUsername, cleanGithubUsername } = require('../services/github.service');
 const {
   syncStudentCodingProfiles,
   getStoredCodingProfiles,
@@ -18,23 +19,30 @@ const updateCodingProfiles = async (req, res, next) => {
       throw new CustomError('Authenticated student context required', 401, 'auth_missing');
     }
 
-    const { leetcodeUsername, codeforcesHandle } = req.body || {};
+    const { leetcodeUsername, codeforcesHandle, githubUsername } = req.body || {};
 
     if (leetcodeUsername !== undefined && leetcodeUsername !== null && leetcodeUsername !== '') {
-      if (!isValidLeetCodeUsername(String(leetcodeUsername))) {
+      if (!isValidLeetCodeUsername(leetcodeUsername)) {
         throw new CustomError('Invalid LeetCode username format. Only letters, numbers, underscores and dashes (1-30 chars) are allowed.', 400, 'LEETCODE_INVALID_USERNAME');
       }
     }
 
     if (codeforcesHandle !== undefined && codeforcesHandle !== null && codeforcesHandle !== '') {
-      if (!isValidCodeforcesHandle(String(codeforcesHandle))) {
+      if (!isValidCodeforcesHandle(codeforcesHandle)) {
         throw new CustomError('Invalid Codeforces handle format. Only letters, numbers, underscores, dots and dashes (2-32 chars) are allowed.', 400, 'CODEFORCES_INVALID_HANDLE');
       }
     }
 
+    if (githubUsername !== undefined && githubUsername !== null && githubUsername !== '') {
+      if (!isValidGithubUsername(githubUsername)) {
+        throw new CustomError('Invalid GitHub username format. Only alphanumeric characters or hyphens (1-39 chars) are allowed.', 400, 'GITHUB_INVALID_USERNAME');
+      }
+    }
+
     const codingProfiles = await syncStudentCodingProfiles(studentId, {
-      leetcodeUsername,
-      codeforcesHandle,
+      leetcodeUsername: leetcodeUsername || (leetcodeUsername === '' ? null : undefined),
+      codeforcesHandle: codeforcesHandle || (codeforcesHandle === '' ? null : undefined),
+      githubUsername: githubUsername || (githubUsername === '' ? null : undefined),
       forceRefresh: true, // When user actively enters/updates handles, fetch fresh data
     });
 

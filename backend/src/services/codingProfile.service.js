@@ -1,7 +1,8 @@
 const db = require('./firestore');
 const logger = require('../utils/logger');
-const { fetchLeetCodeProfile, isValidLeetCodeUsername } = require('./leetcode.service');
-const { fetchCodeforcesProfile, isValidCodeforcesHandle } = require('./codeforces.service');
+const { fetchLeetCodeProfile, isValidLeetCodeUsername, cleanLeetCodeUsername } = require('./leetcode.service');
+const { fetchCodeforcesProfile, isValidCodeforcesHandle, cleanCodeforcesHandle } = require('./codeforces.service');
+const { fetchGithubProfile, isValidGithubUsername, cleanGithubUsername } = require('./github.service');
 
 const DEFAULT_CACHE_TTL_MS = Number(process.env.CODING_PROFILE_CACHE_TTL_MS) || 60 * 60 * 1000; // 1 hour
 
@@ -98,12 +99,31 @@ async function persistCodingProfiles(studentId, codingProfiles) {
   const now = new Date().toISOString();
   const evidence = extractCodingSkillEvidence(codingProfiles.leetcode, codingProfiles.codeforces);
 
+  // Calculate real data points from LeetCode, Codeforces, and GitHub
+  let codingPoints = 0;
+  if (codingProfiles.leetcode && codingProfiles.leetcode.status === 'connected') {
+    const easy = Number(codingProfiles.leetcode.easy || 0);
+    const med = Number(codingProfiles.leetcode.medium || 0);
+    const hard = Number(codingProfiles.leetcode.hard || 0);
+    codingPoints += (easy * 5) + (med * 15) + (hard * 30);
+  }
+  if (codingProfiles.codeforces && codingProfiles.codeforces.status === 'connected') {
+    const rating = Number(codingProfiles.codeforces.rating || 0);
+    const solved = Number(codingProfiles.codeforces.totalSolved || 0);
+    codingPoints += Math.max(0, rating) + (solved * 10);
+  }
+  if (codingProfiles.github && codingProfiles.github.status === 'connected') {
+    codingPoints += Number(codingProfiles.github.points || 0);
+  }
+
   try {
     const profileRef = db.collection('studentProfiles').doc(studentId);
     await profileRef.set(
       {
         codingProfiles,
         codingSkillEvidence: evidence,
+        'points.coding': codingPoints,
+        totalScore: codingPoints,
         updatedAt: now,
       },
       { merge: true }
@@ -118,12 +138,29 @@ async function persistCodingProfiles(studentId, codingProfiles) {
       {
         codingProfiles,
         codingSkillEvidence: evidence,
+        'points.coding': codingPoints,
+        totalScore: codingPoints,
         updatedAt: now,
       },
       { merge: true }
     );
   } catch (err) {
     logger.warn(`[CodingProfileService] users write warning for ${studentId}: ${err.message}`);
+  }
+
+  try {
+    const lbRef = db.collection('studentLeaderboard').doc(studentId);
+    await lbRef.set(
+      {
+        totalScore: codingPoints,
+        overallScore: codingPoints,
+        'categoryScores.coding': codingPoints,
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    // optional
   }
 }
 
@@ -133,26 +170,48 @@ async function persistCodingProfiles(studentId, codingProfiles) {
  * @param {object} options
  * @param {string} [options.leetcodeUsername]
  * @param {string} [options.codeforcesHandle]
+ * @param {string} [options.githubUsername]
  * @param {boolean} [options.forceRefresh=false]
  * @returns {Promise<object>} Normalized coding profiles
  */
 async function syncStudentCodingProfiles(studentId, options = {}) {
-  const { leetcodeUsername, codeforcesHandle, forceRefresh = false } = options;
+  const { leetcodeUsername, codeforcesHandle, githubUsername, forceRefresh = false } = options;
 
   // 1. Get existing stored profiles
   const stored = await getStoredCodingProfiles(studentId);
 
+  const safeClean = (val, platform) => {
+    if (!val || typeof val !== 'string') return null;
+    const trimmed = val.trim();
+    if (!trimmed) return null;
+    if (platform === 'leetcode') {
+      return trimmed.replace(/^https?:\/\/(?:www\.)?leetcode\.com\/(?:u\/)?/i, '').replace(/^\/+|\/+$/g, '').replace(/^@/, '') || null;
+    }
+    if (platform === 'codeforces') {
+      return trimmed.replace(/^https?:\/\/(?:www\.)?codeforces\.com\/profile\//i, '').replace(/^\/+|\/+$/g, '').replace(/^@/, '') || null;
+    }
+    if (platform === 'github') {
+      return trimmed.replace(/^https?:\/\/(?:www\.)?github\.com\//i, '').replace(/^\/+|\/+$/g, '').replace(/^@/, '') || null;
+    }
+    return trimmed;
+  };
+
   const targetLeetcode = leetcodeUsername !== undefined
-    ? (leetcodeUsername ? String(leetcodeUsername).trim() : null)
-    : stored.leetcode?.username || null;
+    ? safeClean(leetcodeUsername, 'leetcode')
+    : (stored.leetcode?.username ? safeClean(stored.leetcode.username, 'leetcode') : null);
 
   const targetCodeforces = codeforcesHandle !== undefined
-    ? (codeforcesHandle ? String(codeforcesHandle).trim() : null)
-    : stored.codeforces?.handle || null;
+    ? safeClean(codeforcesHandle, 'codeforces')
+    : (stored.codeforces?.handle ? safeClean(stored.codeforces.handle, 'codeforces') : null);
+
+  const targetGithub = githubUsername !== undefined
+    ? safeClean(githubUsername, 'github')
+    : (stored.github?.username ? safeClean(stored.github.username, 'github') : null);
 
   const results = {
     leetcode: stored.leetcode || null,
     codeforces: stored.codeforces || null,
+    github: stored.github || null,
   };
 
   const tasks = [];
@@ -242,7 +301,44 @@ async function syncStudentCodingProfiles(studentId, options = {}) {
     results.codeforces = null;
   }
 
-  // 4. Run external queries in parallel
+  // 4. Determine GitHub action
+  if (targetGithub) {
+    const hasFreshData = !forceRefresh &&
+      stored.github?.username?.toLowerCase() === targetGithub.toLowerCase() &&
+      stored.github?.status === 'connected' &&
+      isFresh(stored.github?.fetchedAt);
+
+    if (hasFreshData) {
+      results.github = stored.github;
+    } else {
+      tasks.push(
+        (async () => {
+          try {
+            const data = await fetchGithubProfile(targetGithub);
+            results.github = data;
+          } catch (err) {
+            logger.warn(`[CodingProfileService] GitHub fetch failed for ${targetGithub}: ${err.message}`);
+            results.github = {
+              ...(stored.github || {}),
+              username: targetGithub,
+              profileUrl: `https://github.com/${encodeURIComponent(targetGithub)}`,
+              fetchedAt: new Date().toISOString(),
+              status: 'error',
+              error: err.message || 'Failed to fetch GitHub profile',
+              publicRepos: stored.github?.publicRepos || 0,
+              followers: stored.github?.followers || 0,
+              points: stored.github?.points || 0,
+            };
+          }
+        })()
+      );
+    }
+  } else if (githubUsername === null || githubUsername === '') {
+    // Explicitly unlinked
+    results.github = null;
+  }
+
+  // 5. Run external queries in parallel
   if (tasks.length > 0) {
     await Promise.allSettled(tasks);
   }

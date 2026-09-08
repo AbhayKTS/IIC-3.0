@@ -518,45 +518,101 @@ export default function StudentDashboard() {
               </div>
 
               {/* 3. Live AI Skill Points Engine */}
-              <div className="glass-card p-6 rounded-xl border border-border/80 flex flex-col justify-between space-y-4 hover:border-primary/40 transition-all">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-primary font-semibold text-sm">
-                      <Trophy className="h-4 w-4" /> Skill Graph & Points
+              {(() => {
+                const lcSolved = overview?.codingProfiles?.leetcode?.totalSolved ?? 0;
+                const cfRating = overview?.codingProfiles?.codeforces?.rating ?? 0;
+                const cfSolved = overview?.codingProfiles?.codeforces?.totalSolved ?? 0;
+                const ghHandle = (overview?.codingProfiles as any)?.github?.username || (overview?.user as any)?.github || (overview?.profile as any)?.codingProfiles?.github || '';
+                const ghRepos = (overview?.codingProfiles as any)?.github?.publicRepos ?? 0;
+
+                const lcPoints = ((overview?.codingProfiles?.leetcode?.easy ?? 0) * 5) +
+                                 ((overview?.codingProfiles?.leetcode?.medium ?? 0) * 15) +
+                                 ((overview?.codingProfiles?.leetcode?.hard ?? 0) * 30);
+                const cfPoints = Math.max(0, cfRating) + (cfSolved * 10);
+                const ghPoints = ((overview?.codingProfiles as any)?.github?.points) ?? (ghHandle ? 50 : 0);
+
+                const realCalculatedPoints = (overview?.user?.points?.coding || 0) > 0
+                  ? (overview?.user?.points?.coding || 0)
+                  : (lcPoints + cfPoints + ghPoints);
+
+                const realTier = realCalculatedPoints >= 3000
+                  ? 'Grandmaster Tier'
+                  : realCalculatedPoints >= 1800
+                  ? 'Master Tier'
+                  : realCalculatedPoints >= 1000
+                  ? 'Candidate Master Tier'
+                  : realCalculatedPoints >= 500
+                  ? 'Expert Tier'
+                  : realCalculatedPoints > 0
+                  ? 'Apprentice Coder Tier'
+                  : 'Unranked (Connect handles)';
+
+                const realRankBadge = realCalculatedPoints >= 3000
+                  ? 'Rank #1'
+                  : realCalculatedPoints >= 1800
+                  ? 'Top 5%'
+                  : realCalculatedPoints >= 1000
+                  ? 'Top 15%'
+                  : realCalculatedPoints > 0
+                  ? 'Active'
+                  : 'Unranked';
+
+                return (
+                  <div className="glass-card p-6 rounded-xl border border-border/80 flex flex-col justify-between space-y-4 hover:border-primary/40 transition-all">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-primary font-semibold text-sm">
+                          <Trophy className="h-4 w-4" /> Skill Graph & Points
+                        </div>
+                        <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
+                          {realRankBadge}
+                        </Badge>
+                      </div>
+                      <div>
+                        <span className="text-2xl font-extrabold text-primary block">
+                          {realCalculatedPoints.toLocaleString()} Points
+                        </span>
+                        <span className="text-xs text-muted-foreground">{realTier}</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1 text-center text-[11px] pt-1">
+                        <div className="p-1.5 rounded bg-secondary/30">
+                          <span className="text-[10px] text-muted-foreground block">LeetCode</span>
+                          <strong className="text-foreground">
+                            {overview?.codingProfiles?.leetcode?.username
+                              ? (lcSolved > 0 ? `${lcSolved} Solved` : '0 Solved')
+                              : 'Not Linked'}
+                          </strong>
+                        </div>
+                        <div className="p-1.5 rounded bg-secondary/30">
+                          <span className="text-[10px] text-muted-foreground block">Codeforces</span>
+                          <strong className="text-foreground">
+                            {overview?.codingProfiles?.codeforces?.handle
+                              ? (cfRating > 0 ? `${cfRating} Rtg` : (cfSolved > 0 ? `${cfSolved} Solved` : 'Unrated'))
+                              : 'Not Linked'}
+                          </strong>
+                        </div>
+                        <div className="p-1.5 rounded bg-secondary/30">
+                          <span className="text-[10px] text-muted-foreground block">GitHub</span>
+                          <strong className="text-foreground">
+                            {ghHandle
+                              ? (ghRepos > 0 ? `${ghRepos} Repos` : ghHandle)
+                              : 'Not Linked'}
+                          </strong>
+                        </div>
+                      </div>
                     </div>
-                    <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
-                      Rank #1
-                    </Badge>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => navigate('/student/leaderboard')}
+                      className="w-full justify-between group text-xs"
+                    >
+                      <span>View Tech Leaderboard</span>
+                      <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+                    </Button>
                   </div>
-                  <div>
-                    <span className="text-2xl font-extrabold text-primary block">3,840 Points</span>
-                    <span className="text-xs text-muted-foreground">Grandmaster Coding Tier</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-1 text-center text-[11px] pt-1">
-                    <div className="p-1.5 rounded bg-secondary/30">
-                      <span className="text-[10px] text-muted-foreground block">LeetCode</span>
-                      <strong className="text-foreground">720+</strong>
-                    </div>
-                    <div className="p-1.5 rounded bg-secondary/30">
-                      <span className="text-[10px] text-muted-foreground block">Codeforces</span>
-                      <strong className="text-foreground">1980</strong>
-                    </div>
-                    <div className="p-1.5 rounded bg-secondary/30">
-                      <span className="text-[10px] text-muted-foreground block">GitHub</span>
-                      <strong className="text-foreground">480</strong>
-                    </div>
-                  </div>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => navigate('/student/leaderboard')}
-                  className="w-full justify-between group text-xs"
-                >
-                  <span>View Tech Leaderboard</span>
-                  <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
-                </Button>
-              </div>
+                );
+              })()}
             </div>
 
             {/* D & E. REAL OCR STATUS & RESUME AI PARSER */}

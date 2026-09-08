@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { cleanHandle } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -53,9 +54,9 @@ export default function StudentProfile() {
 
   // Manual skill add
   const [newSkillInput, setNewSkillInput] = useState('');
-  const [githubHandle, setGithubHandle] = useState('ansh-codr');
-  const [leetcodeHandle, setLeetcodeHandle] = useState('ansh_codr');
-  const [codeforcesHandle, setCodeforcesHandle] = useState('ansh_dev');
+  const [githubHandle, setGithubHandle] = useState('');
+  const [leetcodeHandle, setLeetcodeHandle] = useState('');
+  const [codeforcesHandle, setCodeforcesHandle] = useState('');
   const [savingHandles, setSavingHandles] = useState(false);
 
   // Basic Info Edit State
@@ -88,21 +89,30 @@ export default function StudentProfile() {
     try {
       setSavingHandles(true);
       const studentId = session?.userId;
+      const cleanGh = cleanHandle(githubHandle);
+      const cleanLc = cleanHandle(leetcodeHandle);
+      const cleanCf = cleanHandle(codeforcesHandle);
+
+      setGithubHandle(cleanGh);
+      setLeetcodeHandle(cleanLc);
+      setCodeforcesHandle(cleanCf);
+
       if (studentId) {
         await api.updateStudent(studentId, {
-          github: githubHandle,
-          leetcode: leetcodeHandle,
-          codeforces: codeforcesHandle,
+          github: cleanGh,
+          leetcode: cleanLc,
+          codeforces: cleanCf,
         }).catch(() => null);
 
         await api.updateCodingProfiles({
-          leetcodeUsername: leetcodeHandle.trim() || undefined,
-          codeforcesHandle: codeforcesHandle.trim() || undefined,
+          leetcodeUsername: cleanLc || undefined,
+          codeforcesHandle: cleanCf || undefined,
+          githubUsername: cleanGh || undefined,
         }).catch((err) => {
           console.warn('Coding profile sync warning:', err);
         });
       }
-      toast.success('Coding accounts verified & synced to AI Points Engine!');
+      toast.success('Real accounts verified & live data points synchronized!');
     } catch (err: any) {
       toast.error(err.message || 'Failed to update coding accounts');
     } finally {
@@ -669,7 +679,7 @@ export default function StudentProfile() {
             <div className="space-y-1.5">
               <label className="text-xs font-mono font-medium text-foreground">GitHub Username</label>
               <Input
-                placeholder="e.g. ansh-codr"
+                placeholder="e.g. torvalds or username"
                 value={githubHandle}
                 onChange={(e) => setGithubHandle(e.target.value)}
                 className="h-9 text-xs bg-[#0A0B0D] border-line font-mono"
@@ -679,7 +689,7 @@ export default function StudentProfile() {
             <div className="space-y-1.5">
               <label className="text-xs font-mono font-medium text-foreground">LeetCode Handle</label>
               <Input
-                placeholder="e.g. ansh_codr"
+                placeholder="e.g. neal_wu or username"
                 value={leetcodeHandle}
                 onChange={(e) => setLeetcodeHandle(e.target.value)}
                 className="h-9 text-xs bg-[#0A0B0D] border-line font-mono"
@@ -689,7 +699,7 @@ export default function StudentProfile() {
             <div className="space-y-1.5">
               <label className="text-xs font-mono font-medium text-foreground">Codeforces Handle</label>
               <Input
-                placeholder="e.g. ansh_dev"
+                placeholder="e.g. tourist or handle"
                 value={codeforcesHandle}
                 onChange={(e) => setCodeforcesHandle(e.target.value)}
                 className="h-9 text-xs bg-[#0A0B0D] border-line font-mono"

@@ -342,7 +342,7 @@ export const api = {
   async getCodingProfiles(): Promise<{ codingProfiles: CodingProfiles }> {
     return request('/student/coding-profiles', { auth: true });
   },
-  async updateCodingProfiles(data: { leetcodeUsername?: string; codeforcesHandle?: string }): Promise<{ codingProfiles: CodingProfiles }> {
+  async updateCodingProfiles(data: { leetcodeUsername?: string; codeforcesHandle?: string; githubUsername?: string }): Promise<{ codingProfiles: CodingProfiles }> {
     const res = await request('/student/coding-profiles', {
       method: 'PUT',
       body: data,
@@ -356,6 +356,7 @@ export const api = {
           const profileData: any = {};
           if (data.leetcodeUsername) profileData.leetcode = data.leetcodeUsername;
           if (data.codeforcesHandle) profileData.codeforces = data.codeforcesHandle;
+          if (data.githubUsername) profileData.github = data.githubUsername;
           await setDoc(doc(db, 'users', studentId), profileData, { merge: true }).catch(() => null);
           await setDoc(doc(db, 'students', studentId), profileData, { merge: true }).catch(() => null);
         }
@@ -369,6 +370,7 @@ export const api = {
         data: {
           leetcode: data.leetcodeUsername,
           codeforces: data.codeforcesHandle,
+          github: data.githubUsername,
         },
       });
     }

@@ -17,6 +17,20 @@ const RATING_BUCKETS = [
 ];
 
 /**
+ * Cleans user-entered handles or full profile URLs to extract raw Codeforces handle.
+ * @param {string} handle
+ * @returns {string}
+ */
+function cleanCodeforcesHandle(handle) {
+  if (typeof handle !== 'string') return '';
+  return handle
+    .trim()
+    .replace(/^https?:\/\/(?:www\.)?codeforces\.com\/profile\//i, '')
+    .replace(/^\/+|\/+$/g, '')
+    .replace(/^@/, '');
+}
+
+/**
  * Validates a Codeforces handle format.
  * @param {string} handle
  * @returns {boolean}
@@ -147,15 +161,14 @@ function processCodeforcesData(handle, userInfo = {}, submissions = [], ratingHi
  * @param {string} handle
  * @returns {Promise<object>} Normalized Codeforces statistics
  */
-async function fetchCodeforcesProfile(handle) {
-  if (!isValidCodeforcesHandle(handle)) {
+async function fetchCodeforcesProfile(rawHandle) {
+  const cleanHandle = cleanCodeforcesHandle(rawHandle);
+  if (!isValidCodeforcesHandle(cleanHandle)) {
     const err = new Error('Invalid Codeforces handle format');
     err.code = 'CODEFORCES_INVALID_HANDLE';
     err.status = 400;
     throw err;
   }
-
-  const cleanHandle = handle.trim();
 
   try {
     // 1. Fetch user info
@@ -251,6 +264,7 @@ async function fetchCodeforcesProfile(handle) {
 }
 
 module.exports = {
+  cleanCodeforcesHandle,
   isValidCodeforcesHandle,
   fetchCodeforcesProfile,
   processCodeforcesData,

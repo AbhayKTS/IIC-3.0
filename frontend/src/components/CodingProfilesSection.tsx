@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import type { CodingProfiles, LeetCodeStats, CodeforcesStats } from '@/lib/types';
 import { api } from '@/lib/mockApi';
+import { cleanHandle } from '@/lib/utils';
 
 interface CodingProfilesSectionProps {
   initialData?: CodingProfiles | null;
@@ -100,9 +101,15 @@ export default function CodingProfilesSection({
   const handleSaveHandles = async () => {
     try {
       setSaving(true);
+      const cleanLc = cleanHandle(leetcodeInput);
+      const cleanCf = cleanHandle(codeforcesInput);
+
+      setLeetcodeInput(cleanLc);
+      setCodeforcesInput(cleanCf);
+
       const res = await api.updateCodingProfiles({
-        leetcodeUsername: leetcodeInput.trim() || undefined,
-        codeforcesHandle: codeforcesInput.trim() || undefined,
+        leetcodeUsername: cleanLc || undefined,
+        codeforcesHandle: cleanCf || undefined,
       });
 
       if (res?.codingProfiles) {
@@ -110,7 +117,7 @@ export default function CodingProfilesSection({
         onUpdated?.(res.codingProfiles);
       }
 
-      toast.success('Coding profiles connected and updated!');
+      toast.success('Live coding profiles connected & verified from official servers!');
       setIsModalOpen(false);
     } catch (err: any) {
       toast.error(err.message || 'Failed to update coding profiles');
@@ -573,10 +580,10 @@ export default function CodingProfilesSection({
             <div className="space-y-1.5">
               <label className="text-xs font-mono font-medium text-foreground flex items-center justify-between">
                 <span>LeetCode Username</span>
-                <span className="text-muted-foreground text-[10px]">e.g. lee215 or ansh_codr</span>
+                <span className="text-muted-foreground text-[10px]">e.g. lee215, neal_wu (or full profile URL)</span>
               </label>
               <Input
-                placeholder="Enter LeetCode username"
+                placeholder="Enter LeetCode username or URL"
                 value={leetcodeInput}
                 onChange={(e) => setLeetcodeInput(e.target.value)}
                 className="font-mono text-xs"
@@ -587,10 +594,10 @@ export default function CodingProfilesSection({
             <div className="space-y-1.5">
               <label className="text-xs font-mono font-medium text-foreground flex items-center justify-between">
                 <span>Codeforces Handle</span>
-                <span className="text-muted-foreground text-[10px]">e.g. tourist or ansh_dev</span>
+                <span className="text-muted-foreground text-[10px]">e.g. tourist, Benq (or full profile URL)</span>
               </label>
               <Input
-                placeholder="Enter Codeforces handle"
+                placeholder="Enter Codeforces handle or URL"
                 value={codeforcesInput}
                 onChange={(e) => setCodeforcesInput(e.target.value)}
                 className="font-mono text-xs"
