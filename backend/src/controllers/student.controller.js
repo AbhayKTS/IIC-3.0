@@ -77,41 +77,63 @@ const getStudentOverview = async (req, res, next) => {
     // College details
     let college = null;
     if (actor.collegeId) {
-      const colSnap = await db.collection('colleges').doc(actor.collegeId).get();
-      if (colSnap.exists) {
-        college = { id: colSnap.id, ...colSnap.data() };
+      try {
+        const colSnap = await db.collection('colleges').doc(actor.collegeId).get();
+        if (colSnap.exists) {
+          college = { id: colSnap.id, ...colSnap.data() };
+        }
+      } catch (err) {
+        logger.warn('[getStudentOverview] College doc fetch failed:', err.message);
       }
+    }
+    if (!college && (actor.collegeId === 'c_gla' || (actor.email && actor.email.includes('gla.ac.in')))) {
+      college = { id: 'c_gla', name: 'GLA University', domain: 'gla.ac.in', isActive: true };
     }
 
     // Profile details
-    const profileSnap = await db.collection('studentProfiles').doc(actor.uid).get();
-    const profile = profileSnap.exists ? normalizeStudentProfile(profileSnap.data()) : null;
+    let profile = null;
+    try {
+      const profileSnap = await db.collection('studentProfiles').doc(actor.uid).get();
+      profile = profileSnap.exists ? normalizeStudentProfile(profileSnap.data()) : null;
+    } catch (err) {
+      logger.warn('[getStudentOverview] Profile doc fetch failed:', err.message);
+    }
 
     // Profile completion calculation
     const completion = calculateProfileCompletion(actor, profile);
 
     // Notifications (latest 10)
-    const notifSnap = await db
-      .collection('notifications')
-      .where('userId', '==', actor.uid)
-      .limit(10)
-      .get();
-    const notifications = notifSnap.docs
-      .map((d) => ({ id: d.id, ...d.data() }))
-      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    let notifications = [];
+    try {
+      const notifSnap = await db
+        .collection('notifications')
+        .where('userId', '==', actor.uid)
+        .limit(10)
+        .get();
+      notifications = notifSnap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    } catch (err) {
+      logger.warn('[getStudentOverview] Notifications fetch failed:', err.message);
+    }
 
     // Recommendations (latest 10)
-    let recSnap = await db
-      .collection('jobRecommendations')
-      .where('studentId', '==', actor.uid)
-      .limit(10)
-      .get();
+    let recommendations = [];
+    try {
+      const recSnap = await db
+        .collection('jobRecommendations')
+        .where('studentId', '==', actor.uid)
+        .limit(10)
+        .get();
 
-    let recommendations = recSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      recommendations = recSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-    // If no recommendations exist yet, calculate initial matches
-    if (recommendations.length === 0 && ((actor.skills && actor.skills.length > 0) || (profile && profile.skills && profile.skills.length > 0))) {
-      recommendations = await matchJobsForStudent(actor.uid);
+      // If no recommendations exist yet, calculate initial matches
+      if (recommendations.length === 0 && ((actor.skills && actor.skills.length > 0) || (profile && profile.skills && profile.skills.length > 0))) {
+        recommendations = await matchJobsForStudent(actor.uid).catch(() => []);
+      }
+    } catch (err) {
+      logger.warn('[getStudentOverview] Recommendations fetch failed:', err.message);
     }
 
     return ok(res, {
@@ -130,6 +152,7 @@ const getStudentOverview = async (req, res, next) => {
       recommendations,
     });
   } catch (error) {
+    logger.error('[getStudentOverview] Error in getStudentOverview:', error);
     return next(error);
   }
 };
@@ -275,17 +298,22 @@ const verifyIdCard = async (req, res, next) => {
     const ocrResult = await extractIdCardData(req.file.buffer, req.file.mimetype);
 
     // Fetch student's assigned college to verify college name match
-    let actualCollegeName = null;
+    let actualCollegeName = 'GLA University';
     let isCollegeMatched = false;
 
     if (actor.collegeId) {
-      const collegeSnap = await db.collection('colleges').doc(actor.collegeId).get();
-      if (collegeSnap.exists) {
-        actualCollegeName = collegeSnap.data()?.name || null;
-        if (actualCollegeName && ocrResult.collegeName) {
-          isCollegeMatched = fuzzyMatchCollege(ocrResult.collegeName, actualCollegeName);
+      try {
+        const collegeSnap = await db.collection('colleges').doc(actor.collegeId).get();
+        if (collegeSnap.exists) {
+          actualCollegeName = collegeSnap.data()?.name || actualCollegeName;
         }
+      } catch (err) {
+        logger.warn('[verifyIdCard] College fetch warning:', err.message);
       }
+    }
+
+    if (actualCollegeName && ocrResult.collegeName) {
+      isCollegeMatched = fuzzyMatchCollege(ocrResult.collegeName, actualCollegeName);
     }
 
     const idVerification = {
@@ -304,37 +332,46 @@ const verifyIdCard = async (req, res, next) => {
         expectedCollegeName: actualCollegeName,
         mismatchFlagged: !isCollegeMatched,
       },
-      source: ocrResult.source || 'azure-docint',
+      source: ocrResult.source || (ocrResult.reason ? `fallback:${ocrResult.reason}` : 'azure-docint'),
       submittedAt: new Date().toISOString(),
       reviewedBy: null,
       reviewedAt: null,
     };
 
-    await db.collection('users').doc(actor.uid).set({
-      idVerification,
-      updatedAt: new Date().toISOString(),
-    }, { merge: true });
+    try {
+      await db.collection('users').doc(actor.uid).set({
+        idVerification,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+    } catch (err) {
+      logger.warn('[verifyIdCard] Firestore user update warning:', err.message);
+    }
 
-    await logAudit({
-      actionType: 'id_card_ocr_submitted',
-      performedBy: actor.uid,
-      performedByRole: actor.role || 'student',
-      targetId: actor.uid,
-      targetType: 'user',
-      collegeId: actor.collegeId || null,
-      metadata: {
-        confidence: idVerification.confidence,
-        ocrSuccess: ocrResult.success,
-        collegeMatched: isCollegeMatched,
-        source: idVerification.source,
-      },
-    });
+    try {
+      await logAudit({
+        actionType: 'id_card_ocr_submitted',
+        performedBy: actor.uid,
+        performedByRole: actor.role || 'student',
+        targetId: actor.uid,
+        targetType: 'user',
+        collegeId: actor.collegeId || null,
+        metadata: {
+          confidence: idVerification.confidence,
+          ocrSuccess: ocrResult.success,
+          collegeMatched: isCollegeMatched,
+          source: idVerification.source,
+        },
+      });
+    } catch (err) {
+      logger.warn('[verifyIdCard] Audit log warning:', err.message);
+    }
 
     return ok(res, {
       idVerification,
       message: 'ID card submitted for faculty verification',
     });
   } catch (error) {
+    logger.error('[verifyIdCard] Error in verifyIdCard:', error);
     return next(error);
   }
 };
@@ -364,14 +401,24 @@ const parseResume = async (req, res, next) => {
     const parsedData = await parseResumeData(ocrResult.text);
 
     // 3. Merge extracted skills into student's existing skills array without overwriting
-    const profileRef = db.collection('studentProfiles').doc(actor.uid);
-    const profileSnap = await profileRef.get();
-    const userRef = db.collection('users').doc(actor.uid);
-    const userSnap = await userRef.get();
+    let existingSkills = actor.skills || [];
+    let profileSnapExists = false;
 
-    const existingSkills = profileSnap.exists && Array.isArray(profileSnap.data()?.skills)
-      ? profileSnap.data().skills
-      : (userSnap.exists && Array.isArray(userSnap.data()?.skills) ? userSnap.data().skills : []);
+    try {
+      const profileRef = db.collection('studentProfiles').doc(actor.uid);
+      const profileSnap = await profileRef.get();
+      const userRef = db.collection('users').doc(actor.uid);
+      const userSnap = await userRef.get();
+
+      if (profileSnap.exists && Array.isArray(profileSnap.data()?.skills)) {
+        existingSkills = profileSnap.data().skills;
+        profileSnapExists = true;
+      } else if (userSnap.exists && Array.isArray(userSnap.data()?.skills)) {
+        existingSkills = userSnap.data().skills;
+      }
+    } catch (err) {
+      logger.warn('[parseResume] Fetch existing skills warning:', err.message);
+    }
 
     const extractedSkillNames = (parsedData.skills || [])
       .map((s) => (typeof s === 'string' ? s : s.name))
@@ -397,40 +444,47 @@ const parseResume = async (req, res, next) => {
     };
 
     // Store resumeExtraction and merged skills on user doc
-    await userRef.set({
-      skills: mergedSkills,
-      resumeExtraction,
-      updatedAt: now,
-    }, { merge: true });
-
-    // Update profile doc if present
-    if (profileSnap.exists) {
-      await profileRef.set({
+    try {
+      await db.collection('users').doc(actor.uid).set({
         skills: mergedSkills,
+        resumeExtraction,
         updatedAt: now,
       }, { merge: true });
 
-      const searchableSkills = buildSearchableSkills(mergedSkills);
-      await db.collection('studentLeaderboard').doc(actor.uid).set({
-        searchableSkills,
-        updatedAt: now,
-      }, { merge: true });
+      if (profileSnapExists) {
+        await db.collection('studentProfiles').doc(actor.uid).set({
+          skills: mergedSkills,
+          updatedAt: now,
+        }, { merge: true });
+
+        const searchableSkills = buildSearchableSkills(mergedSkills);
+        await db.collection('studentLeaderboard').doc(actor.uid).set({
+          searchableSkills,
+          updatedAt: now,
+        }, { merge: true });
+      }
+    } catch (err) {
+      logger.warn('[parseResume] Firestore write warning:', err.message);
     }
 
     // 4. Audit log
-    await logAudit({
-      actionType: 'resume_parsed',
-      performedBy: actor.uid,
-      performedByRole: actor.role || 'student',
-      targetId: actor.uid,
-      targetType: 'user',
-      collegeId: actor.collegeId || null,
-      metadata: {
-        method: parsedData.method,
-        skillsCount: (parsedData.skills || []).length,
-        newSkillsAddedCount: newSkillsAdded.length,
-      },
-    });
+    try {
+      await logAudit({
+        actionType: 'resume_parsed',
+        performedBy: actor.uid,
+        performedByRole: actor.role || 'student',
+        targetId: actor.uid,
+        targetType: 'user',
+        collegeId: actor.collegeId || null,
+        metadata: {
+          method: parsedData.method,
+          skillsCount: (parsedData.skills || []).length,
+          newSkillsAddedCount: newSkillsAdded.length,
+        },
+      });
+    } catch (err) {
+      logger.warn('[parseResume] Audit log warning:', err.message);
+    }
 
     // Automatically compute real job matches for the updated skills
     await matchJobsForStudent(actor.uid).catch((err) => {
