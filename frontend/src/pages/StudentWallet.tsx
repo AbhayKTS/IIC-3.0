@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { useAuth } from '@/lib/auth';
+import { api } from '@/lib/mockApi';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -125,12 +126,35 @@ export default function StudentWallet() {
     }
   };
 
-  const handleOffRamp = () => {
+  const handleOffRamp = async () => {
     const n = parseFloat(offRampAmount);
     if (isNaN(n) || n <= 0 || n > usdcBalance) { toast.error(`Enter a valid amount up to $${usdcBalance}`); return; }
     if (!upiId.includes('@')) { toast.error('Enter a valid UPI ID'); return; }
+
+    const inrValue = Math.round(n * 86);
+
+    // Save transaction
+    saveTxRecord({
+      hash: `wth_${Date.now().toString(36)}`,
+      type: 'PAYOUT',
+      label: `Student UPI Withdrawal to ${upiId}`,
+      amount: `${n}`,
+      timestamp: Date.now(),
+      status: 'confirmed',
+      network: 'Polygon Amoy (IMPS Off-Ramp)',
+    });
+
+    // Send notification
+    await api.createNotification({
+      userId,
+      type: 'withdrawal',
+      title: '💸 Earnings Withdrawn via UPI',
+      body: `Your withdrawal of ₹${inrValue.toLocaleString('en-IN')} ($${n} USDC) has been successfully remitted to ${upiId} via IMPS.`,
+      meta: { amount: n, inrValue, upiId },
+    }).catch(() => null);
+
     setOffRampOpen(false);
-    toast.success(`Off-ramp initiated: ₹${(n * 86).toLocaleString()} INR → ${upiId} via IMPS`);
+    toast.success(`💸 Withdrawal completed! ₹${inrValue.toLocaleString('en-IN')} INR sent to ${upiId} via IMPS`);
   };
 
   return (

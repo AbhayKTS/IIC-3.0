@@ -3,7 +3,7 @@ import { useAuth } from '@/lib/auth';
 import type { UserRole } from '@/lib/types';
 import {
   LayoutDashboard, User, Trophy, Briefcase,
-  Wallet, Zap, Shield, LogOut, ChevronLeft, Menu, Layers, Building2
+  Wallet, Zap, Shield, LogOut, ChevronLeft, Menu, Layers, Building2, Video
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -12,6 +12,7 @@ interface NavItem { label: string; href: string; icon: React.ReactNode }
 const studentNav: NavItem[] = [
   { label: 'Dashboard', href: '/student/dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
   { label: 'Profile', href: '/student/profile', icon: <User className="h-4 w-4" /> },
+  { label: 'Peer Courses', href: '/student/courses', icon: <Video className="h-4 w-4" /> },
   { label: 'Leaderboard', href: '/student/leaderboard', icon: <Trophy className="h-4 w-4" /> },
   { label: 'Wallet & SBTs', href: '/student/wallet', icon: <Wallet className="h-4 w-4" /> },
   { label: 'Transactions', href: '/student/transactions', icon: <Layers className="h-4 w-4" /> },
