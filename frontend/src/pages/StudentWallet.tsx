@@ -5,18 +5,76 @@ import { api } from '@/lib/mockApi';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import {
   Wallet, Shield, Award, Copy, ExternalLink, Coins, CheckCircle2,
-  Lock, Sparkles, RefreshCw, TrendingUp, ArrowUpRight, Zap, AlertCircle, Key
+  Lock, Sparkles, RefreshCw, TrendingUp, ArrowUpRight, Zap, AlertCircle, Key,
+  History, ArrowDownLeft
 } from 'lucide-react';
 import {
   generateWalletFromSeed, fetchNativeBalance, simulateMintSBT,
   formatAddress, explorerTxUrl, explorerAddressUrl, AMOY_FAUCET, AMOY_EXPLORER,
-  fetchSBTsForAddress, saveTxRecord, type OnChainSBT
+  fetchSBTsForAddress, saveTxRecord, getTxHistory, type OnChainSBT
 } from '@/lib/web3';
+import { collection, query, where, orderBy, limit, onSnapshot, addDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+
+interface StudentTransaction {
+  id: string;
+  type: 'PAYOUT' | 'GIG_PAYOUT' | 'SBT_MINT' | 'TOPUP';
+  label: string;
+  amount: string;
+  timestamp: number;
+  status: 'confirmed' | 'pending';
+  network?: string;
+  txHash?: string;
+}
+
+const DEFAULT_STUDENT_TRANSACTIONS: StudentTransaction[] = [
+  {
+    id: 'stx_gig_1',
+    type: 'GIG_PAYOUT',
+    label: 'MicroGig Payout: Smart Contract Audit & Test Coverage',
+    amount: '+180 POL',
+    timestamp: Date.now() - 3600000 * 3, // 3 hours ago
+    status: 'confirmed',
+    network: 'Polygon Amoy Testnet',
+    txHash: '0x8f2a6b7c9d1e4a5b6c7d8e9f0a1b2c3d4e5f6a7b',
+  },
+  {
+    id: 'stx_gig_2',
+    type: 'GIG_PAYOUT',
+    label: 'MicroGig Payout: React + Tailwind Dashboard Component',
+    amount: '+120 POL',
+    timestamp: Date.now() - 3600000 * 26, // 1 day ago
+    status: 'confirmed',
+    network: 'Polygon Amoy Testnet',
+    txHash: '0x3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d',
+  },
+  {
+    id: 'stx_wth_1',
+    type: 'PAYOUT',
+    label: 'Student UPI Withdrawal to student@okaxis (₹1,750)',
+    amount: '-50 POL',
+    timestamp: Date.now() - 3600000 * 72, // 3 days ago
+    status: 'confirmed',
+    network: 'Polygon Amoy (IMPS Off-Ramp)',
+    txHash: '0x1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b',
+  },
+  {
+    id: 'stx_sbt_1',
+    type: 'SBT_MINT',
+    label: 'Minted Soulbound Token: Smart India Hackathon 2026 Winner',
+    amount: '0 POL',
+    timestamp: Date.now() - 3600000 * 120, // 5 days ago
+    status: 'confirmed',
+    network: 'Polygon Amoy Testnet',
+    txHash: '0x5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c',
+  },
+];
 
 export default function StudentWallet() {
   const { session } = useAuth();
@@ -41,19 +99,83 @@ export default function StudentWallet() {
   const [achievementIssuer, setAchievementIssuer] = useState('');
   const [minting, setMinting] = useState(false);
 
-  // Off-ramp modal
-  const [offRampOpen, setOffRampOpen] = useState(false);
-  const [offRampAmount, setOffRampAmount] = useState('50');
-  const [upiId, setUpiId] = useState('student@okaxis');
+  // Dynamic POL Earnings
+  const [polEarnings, setPolEarnings] = useState<number>(350.0);
 
-  // Static balances (would be fetched from API in production)
-  const polEarnings = 350.0;
+  // Transactions State
+  const [transactions, setTransactions] = useState<StudentTransaction[]>(DEFAULT_STUDENT_TRANSACTIONS);
 
-  // Generate wallet from userId on mount
+  // Withdrawal modal state (Full parity with Recruiter)
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState('50');
+  const [withdrawMethod, setWithdrawMethod] = useState<'upi' | 'bank'>('upi');
+  const [withdrawDestination, setWithdrawDestination] = useState('student@okaxis');
+  const [isProcessingWithdraw, setIsProcessingWithdraw] = useState(false);
+
+  // Generate deterministic custodial Polygon address
   useEffect(() => {
     const wallet = generateWalletFromSeed(userId);
     setWalletAddress(wallet.address);
     setWalletPrivateKey(wallet.privateKey);
+  }, [userId]);
+
+  // Load and merge local transactions
+  useEffect(() => {
+    const localLogs = getTxHistory();
+    if (localLogs && localLogs.length > 0) {
+      const converted: StudentTransaction[] = localLogs.map(l => ({
+        id: l.hash,
+        type: (l.type === 'GIG_PAYOUT' ? 'GIG_PAYOUT' : l.type === 'SBT_MINT' ? 'SBT_MINT' : 'PAYOUT'),
+        label: l.label,
+        amount: l.amount || '0 POL',
+        timestamp: l.timestamp,
+        status: l.status,
+        network: l.network,
+        txHash: l.hash,
+      }));
+
+      setTransactions(prev => {
+        const merged = [...converted];
+        prev.forEach(p => {
+          if (!merged.find(m => m.id === p.id || m.txHash === p.txHash)) {
+            merged.push(p);
+          }
+        });
+        return merged.sort((a, b) => b.timestamp - a.timestamp);
+      });
+    }
+  }, []);
+
+  // Listen to Firestore transactions if available
+  useEffect(() => {
+    if (!userId || !db) return;
+    try {
+      const txRef = collection(db, 'transactions');
+      const q = query(
+        txRef,
+        where('userId', '==', userId),
+        orderBy('timestamp', 'desc'),
+        limit(20)
+      );
+      const unsub = onSnapshot(q, (snap) => {
+        if (!snap.empty) {
+          const fsTxs = snap.docs.map(d => ({ id: d.id, ...d.data() } as StudentTransaction));
+          setTransactions(prev => {
+            const merged = [...fsTxs];
+            prev.forEach(p => {
+              if (!merged.find(m => m.id === p.id || (m.txHash && m.txHash === p.txHash))) {
+                merged.push(p);
+              }
+            });
+            return merged.sort((a, b) => b.timestamp - a.timestamp);
+          });
+        }
+      }, () => null);
+
+      return () => unsub();
+    } catch (_) {
+      // Ignored if offline or collection not indexed
+    }
   }, [userId]);
 
   // Fetch POL balance from Amoy testnet
@@ -113,6 +235,18 @@ export default function StudentWallet() {
         network: 'Polygon Amoy Testnet',
       });
 
+      const newTx: StudentTransaction = {
+        id: result.txHash,
+        type: 'SBT_MINT',
+        label: `Minted Soulbound Token: ${achievementTitle}`,
+        amount: '0 POL',
+        timestamp: Date.now(),
+        status: 'confirmed',
+        network: 'Polygon Amoy Testnet',
+        txHash: result.txHash,
+      };
+      setTransactions(prev => [newTx, ...prev]);
+
       setSbts(prev => [newSbt, ...prev]);
       setAddModalOpen(false);
       setAchievementTitle('');
@@ -126,53 +260,144 @@ export default function StudentWallet() {
     }
   };
 
-  const handleOffRamp = async () => {
-    const n = parseFloat(offRampAmount);
-    if (isNaN(n) || n <= 0 || n > polEarnings) { toast.error(`Enter a valid amount up to ${polEarnings} POL`); return; }
-    if (!upiId.includes('@')) { toast.error('Enter a valid UPI ID'); return; }
+  // Comprehensive Withdrawal (UPI or Bank IMPS)
+  const handleWithdraw = async () => {
+    const amountNum = parseFloat(withdrawAmount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      toast.error('Please enter a valid amount in POL');
+      return;
+    }
+    if (amountNum > polEarnings) {
+      toast.error(`Insufficient earnings. Available: ${polEarnings} POL`);
+      return;
+    }
 
-    const inrValue = Math.round(n * 35);
+    if (withdrawMethod === 'upi') {
+      if (!withdrawDestination.includes('@')) {
+        toast.error('Please enter a valid UPI ID (e.g. name@okhdfcbank)');
+        return;
+      }
+    } else {
+      if (withdrawDestination.trim().length < 6) {
+        toast.error('Please enter a valid Bank Account Number and IFSC Code');
+        return;
+      }
+    }
 
-    // Save transaction
-    saveTxRecord({
-      hash: `wth_${Date.now().toString(36)}`,
-      type: 'PAYOUT',
-      label: `Student UPI Withdrawal to ${upiId}`,
-      amount: `-${n} POL`,
-      timestamp: Date.now(),
-      status: 'confirmed',
-      network: 'Polygon Amoy (IMPS Off-Ramp)',
-    });
+    setIsProcessingWithdraw(true);
+    try {
+      // 1 POL ≈ ₹35 INR
+      const inrValue = Math.round(amountNum * 35);
+      const randomHex = Math.floor(Math.random() * 0xffffffff).toString(16).padStart(8, '0');
+      const fakeTxHash = `0x${randomHex}892b1049f7e61a4c8032${randomHex}`;
 
-    // Send notification
-    await api.createNotification({
-      userId,
-      type: 'withdrawal',
-      title: '💸 Earnings Withdrawn via UPI',
-      body: `Your withdrawal of ${n} POL (₹${inrValue.toLocaleString('en-IN')}) has been successfully remitted to ${upiId} via IMPS.`,
-      meta: { amount: n, inrValue, upiId },
-    }).catch(() => null);
+      // Deduct earnings
+      setPolEarnings(prev => Math.max(0, +(prev - amountNum).toFixed(2)));
 
-    setOffRampOpen(false);
-    toast.success(`💸 Withdrawal completed! ₹${inrValue.toLocaleString('en-IN')} INR (${n} POL) sent to ${upiId} via IMPS`);
+      const newTx: StudentTransaction = {
+        id: `wth_${Date.now()}`,
+        type: 'PAYOUT',
+        label: withdrawMethod === 'upi'
+          ? `Student UPI Withdrawal to ${withdrawDestination} (₹${inrValue.toLocaleString('en-IN')})`
+          : `Student Bank Transfer to ${withdrawDestination} (₹${inrValue.toLocaleString('en-IN')})`,
+        amount: `-${amountNum} POL`,
+        timestamp: Date.now(),
+        status: 'confirmed',
+        network: 'Polygon Amoy (IMPS Off-Ramp)',
+        txHash: fakeTxHash,
+      };
+
+      // Add to local state
+      setTransactions(prev => [newTx, ...prev]);
+
+      // Save to local storage log
+      saveTxRecord({
+        hash: fakeTxHash,
+        type: 'POL_TRANSFER',
+        label: newTx.label,
+        amount: `-${amountNum} POL`,
+        timestamp: Date.now(),
+        status: 'confirmed',
+        network: 'Polygon Amoy Testnet',
+      });
+
+      // Save to Firestore if available
+      if (db) {
+        try {
+          await addDoc(collection(db, 'transactions'), {
+            userId,
+            type: 'PAYOUT',
+            label: newTx.label,
+            amount: `-${amountNum} POL`,
+            timestamp: Date.now(),
+            status: 'confirmed',
+            network: 'Polygon Amoy (IMPS Off-Ramp)',
+            txHash: fakeTxHash,
+            amountInr: inrValue,
+            tokensWithdrawn: amountNum,
+          });
+        } catch (_) {}
+      }
+
+      // Send real-time notification to the student
+      await api.createNotification({
+        userId,
+        type: 'withdrawal',
+        title: '💸 Earnings Withdrawn via ' + (withdrawMethod === 'upi' ? 'UPI' : 'Bank IMPS'),
+        body: `Your withdrawal of ${amountNum} POL (₹${inrValue.toLocaleString('en-IN')}) has been dispatched to ${withdrawDestination} via instant IMPS.`,
+        meta: { amount: amountNum, inrValue, destination: withdrawDestination, method: withdrawMethod },
+      }).catch(() => null);
+
+      setWithdrawOpen(false);
+      toast.success(`💸 Dispatched ₹${inrValue.toLocaleString('en-IN')} (${amountNum} POL) to ${withdrawDestination}!`);
+    } catch (err: any) {
+      toast.error('Withdrawal failed: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsProcessingWithdraw(false);
+    }
   };
 
   return (
     <DashboardLayout role="student">
       <div className="max-w-5xl mx-auto space-y-8 py-2">
 
-        {/* ── Wallet Header ─────────────────────────────────────── */}
+        {/* ── Wallet Header & Primary Card ──────────────────────── */}
         <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/8 via-accent/5 to-transparent p-6 md:p-8">
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
             <div className="space-y-3 flex-1 min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                <Shield className="h-3.5 w-3.5" /> Polygon Amoy Testnet · ERC-4337 Custodial
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                  <Shield className="h-3.5 w-3.5" /> Polygon Amoy Testnet · ERC-4337 Smart Account
+                </div>
+
+                {/* Top Action Buttons */}
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={refreshBalance}
+                    disabled={balanceLoading}
+                    className="h-8 text-xs gap-1.5 font-medium"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${balanceLoading ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => setWithdrawOpen(true)}
+                    className="h-8 text-xs font-semibold gap-1.5 border border-amber-600/40 text-amber-800 dark:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 shadow-sm"
+                  >
+                    <ArrowUpRight className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                    Withdraw Funds (INR)
+                  </Button>
+                </div>
               </div>
+
               <h1 className="text-2xl md:text-3xl font-bold text-foreground" style={{ fontFamily: '"Fraunces", serif' }}>
-                Almadox Identity Wallet
+                Student Identity & Polygon Treasury
               </h1>
               <p className="text-muted-foreground text-sm leading-relaxed max-w-lg">
-                Auto-provisioned on signup. Holds non-transferable Soulbound Tokens (SBTs) and receives MicroGig payouts in POL tokens. Withdrawable to INR via UPI.
+                Auto-provisioned on signup. Holds non-transferable Soulbound Tokens (SBTs) and receives MicroGig rewards in Polygon (POL) coin. Withdrawable directly to INR via UPI or IMPS.
               </p>
 
               {/* Address Bar */}
@@ -211,15 +436,15 @@ export default function StudentWallet() {
                 <div className="text-[11px] text-muted-foreground">Polygon Amoy (live)</div>
               </div>
 
-              {/* POL Earnings */}
+              {/* POL Earnings Card */}
               <div className="p-4 rounded-xl bg-card border border-border/80 shadow-sm min-w-[160px] space-y-1">
                 <span className="text-xs text-muted-foreground flex items-center gap-1">
                   <Coins className="h-3.5 w-3.5 text-purple-500" /> POL Earnings
                 </span>
                 <div className="text-2xl font-black text-foreground">{polEarnings.toFixed(2)} POL</div>
                 <div className="text-[11px] text-purple-700 dark:text-purple-300 font-medium">≈ ₹{(polEarnings * 35).toLocaleString('en-IN')} INR</div>
-                <Button size="sm" onClick={() => setOffRampOpen(true)} className="w-full mt-2 h-7 text-xs gap-1">
-                  Off-Ramp to INR <ArrowUpRight className="h-3 w-3" />
+                <Button size="sm" onClick={() => setWithdrawOpen(true)} className="w-full mt-2 h-7 text-xs gap-1">
+                  Withdraw to INR <ArrowUpRight className="h-3 w-3" />
                 </Button>
               </div>
 
@@ -236,6 +461,95 @@ export default function StudentWallet() {
           </div>
         </div>
 
+        {/* ── Transaction View & Audit History (Parity with Recruiter) ── */}
+        <div className="glass-card p-6 rounded-2xl border border-border/80 space-y-4 shadow-sm bg-card">
+          <div className="flex items-center justify-between border-b border-border/60 pb-3">
+            <div>
+              <h2 className="text-base font-bold text-foreground font-mono flex items-center gap-2">
+                <History className="h-4 w-4 text-purple-600 dark:text-purple-400" /> Polygon Earnings & Withdrawal Activity
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5 font-mono">
+                Real-time audit trail of student MicroGig bounties, SBT credentials, and instant UPI/IMPS INR withdrawals.
+              </p>
+            </div>
+            <Badge variant="outline" className="text-xs font-mono text-foreground border-border">
+              {transactions.length} Records
+            </Badge>
+          </div>
+
+          <div className="divide-y divide-border/60">
+            {transactions.length > 0 ? (
+              transactions.map((tx) => (
+                <div key={tx.id} className="py-3.5 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 ${
+                      tx.type === 'GIG_PAYOUT' || tx.type === 'TOPUP'
+                        ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                        : tx.type === 'SBT_MINT'
+                        ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30'
+                        : 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30'
+                    }`}>
+                      {tx.type === 'GIG_PAYOUT' || tx.type === 'TOPUP' ? (
+                        <ArrowDownLeft className="h-4 w-4" />
+                      ) : tx.type === 'SBT_MINT' ? (
+                        <Sparkles className="h-4 w-4" />
+                      ) : (
+                        <ArrowUpRight className="h-4 w-4" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-xs text-foreground truncate font-mono">
+                        {tx.label}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground font-mono mt-0.5 flex items-center gap-2">
+                        <span>{new Date(tx.timestamp).toLocaleString()}</span>
+                        {tx.network && (
+                          <>
+                            <span>•</span>
+                            <span className="text-muted-foreground font-medium">{tx.network}</span>
+                          </>
+                        )}
+                        {tx.txHash && (
+                          <>
+                            <span>•</span>
+                            <a
+                              href={explorerTxUrl(tx.txHash)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-primary hover:underline cursor-pointer"
+                            >
+                              {tx.txHash.slice(0, 10)}...
+                            </a>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <div className={`text-xs font-mono font-bold ${
+                      tx.amount.startsWith('+')
+                        ? 'text-emerald-700 dark:text-emerald-400'
+                        : tx.amount.startsWith('-')
+                        ? 'text-rose-700 dark:text-rose-400'
+                        : 'text-foreground'
+                    }`}>
+                      {tx.amount}
+                    </div>
+                    <Badge variant="outline" className="text-[10px] font-mono capitalize border-border text-foreground mt-0.5">
+                      {tx.status}
+                    </Badge>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="py-8 text-center text-xs text-muted-foreground font-mono">
+                No activity recorded yet. Apply for MicroGigs to receive Polygon POL earnings.
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* ── SBT Gallery ──────────────────────────────────────── */}
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -248,7 +562,7 @@ export default function StudentWallet() {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/30 gap-1.5 py-1 px-2.5 text-xs">
+              <Badge className="bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30 gap-1.5 py-1 px-2.5 text-xs">
                 <Lock className="h-3 w-3" /> Non-Transferable
               </Badge>
               <Button size="sm" onClick={() => setAddModalOpen(true)} className="gap-1.5 text-xs">
@@ -396,40 +710,138 @@ export default function StudentWallet() {
           </DialogContent>
         </Dialog>
 
-        {/* ── Off-Ramp Modal ───────────────────────────────────── */}
-        <Dialog open={offRampOpen} onOpenChange={setOffRampOpen}>
-          <DialogContent className="sm:max-w-md">
+        {/* ── Comprehensive Student Withdrawal Dialog (POL → INR) ── */}
+        <Dialog open={withdrawOpen} onOpenChange={setWithdrawOpen}>
+          <DialogContent className="bg-card border-border text-foreground max-w-md shadow-2xl">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2"><Coins className="h-5 w-5 text-purple-500" /> Off-Ramp POL to INR</DialogTitle>
-              <DialogDescription>Convert your MicroGig POL earnings directly to Indian Rupees via UPI.</DialogDescription>
+              <DialogTitle className="text-base font-bold flex items-center gap-2 font-mono text-foreground">
+                <ArrowUpRight className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                Withdraw Polygon Earnings (POL → INR)
+              </DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground font-mono">
+                Convert and remit your verified MicroGig POL earnings directly to your Indian bank account or personal UPI ID via instant IMPS payout.
+              </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-2">
+
+            <div className="space-y-4 mt-2">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">Amount in POL (Max: {polEarnings} POL)</label>
-                <div className="relative">
-                  <input type="number" max={polEarnings} min={1} value={offRampAmount} onChange={e => setOffRampAmount(e.target.value)}
-                    className="w-full rounded-md border border-input bg-background p-2.5 text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-primary" />
-                  <button onClick={() => setOffRampAmount(polEarnings.toString())} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-primary font-semibold hover:underline">MAX</button>
+                <div className="flex justify-between text-xs font-mono">
+                  <label className="text-foreground font-semibold">Withdrawal Amount (POL)</label>
+                  <span className="text-muted-foreground font-medium">Available: {polEarnings.toFixed(2)} POL</span>
                 </div>
-                <p className="text-[11px] text-muted-foreground">≈ <strong className="text-foreground">₹{(parseFloat(offRampAmount || '0') * 35).toLocaleString('en-IN')} INR</strong> (1 POL ≈ ₹35.00)</p>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    placeholder="50"
+                    max={polEarnings}
+                    className="bg-background border-input text-xs font-mono text-foreground"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setWithdrawAmount(polEarnings.toString())}
+                    className="absolute right-12 top-2.5 text-[11px] text-primary font-mono font-semibold hover:underline"
+                  >
+                    MAX
+                  </button>
+                  <span className="absolute right-3 top-2.5 text-xs text-purple-600 dark:text-purple-400 font-mono font-bold">POL</span>
+                </div>
               </div>
+
+              {/* Method Selector */}
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setWithdrawMethod('upi')}
+                  className={`font-mono text-xs font-semibold ${
+                    withdrawMethod === 'upi'
+                      ? 'border-primary text-primary bg-primary/10'
+                      : 'border-border text-foreground hover:bg-secondary'
+                  }`}
+                >
+                  UPI (Instant)
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setWithdrawMethod('bank')}
+                  className={`font-mono text-xs font-semibold ${
+                    withdrawMethod === 'bank'
+                      ? 'border-primary text-primary bg-primary/10'
+                      : 'border-border text-foreground hover:bg-secondary'
+                  }`}
+                >
+                  Bank Transfer (IMPS)
+                </Button>
+              </div>
+
+              {/* Destination Input */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">UPI ID / VPA</label>
-                <input type="text" placeholder="name@okhdfcbank" value={upiId} onChange={e => setUpiId(e.target.value)}
-                  className="w-full rounded-md border border-input bg-background p-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
+                <label className="text-xs font-mono text-foreground font-semibold">
+                  {withdrawMethod === 'upi' ? 'Student UPI ID / VPA' : 'Bank Account Number & IFSC'}
+                </label>
+                <Input
+                  value={withdrawDestination}
+                  onChange={(e) => setWithdrawDestination(e.target.value)}
+                  placeholder={withdrawMethod === 'upi' ? 'e.g. student@okaxis' : 'e.g. 50100421987654 (HDFC0000123)'}
+                  className="bg-background border-input text-xs font-mono text-foreground"
+                />
               </div>
-              <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-3 text-[11px] text-emerald-700 dark:text-emerald-400">
-                ⚡ Instant IMPS settlement via licensed Polygon off-ramp gateway. No gas fees deducted.
+
+              {/* Settlement Route and Rate Calculation */}
+              <div className="p-3.5 rounded-xl bg-secondary/50 border border-border text-xs font-mono space-y-1.5">
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span>Settlement Route:</span>
+                  <span className="text-foreground font-medium">Licensed Polygon Gateway (Zero Gas Fees)</span>
+                </div>
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span>Conversion Rate:</span>
+                  <span className="text-foreground font-medium">1 POL ≈ ₹35.00 INR</span>
+                </div>
+                <div className="flex items-center justify-between text-muted-foreground pt-1 border-t border-border/40">
+                  <span>Estimated INR Received:</span>
+                  <span className="text-amber-700 dark:text-amber-400 font-bold text-sm">
+                    ≈ ₹{Math.round((parseFloat(withdrawAmount) || 0) * 35).toLocaleString('en-IN')} INR
+                  </span>
+                </div>
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setOffRampOpen(false)}>Cancel</Button>
-              <Button onClick={handleOffRamp}>Confirm INR Payout</Button>
+
+            <DialogFooter className="mt-4 pt-3 border-t border-border">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setWithdrawOpen(false)}
+                className="font-mono text-xs text-foreground"
+                disabled={isProcessingWithdraw}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleWithdraw}
+                disabled={isProcessingWithdraw || !withdrawAmount || (parseFloat(withdrawAmount) || 0) <= 0 || (parseFloat(withdrawAmount) || 0) > polEarnings}
+                className="bg-amber-600 hover:bg-amber-500 text-white font-mono text-xs font-semibold gap-1.5 shadow-sm"
+              >
+                {isProcessingWithdraw ? (
+                  <>
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Remitting...
+                  </>
+                ) : (
+                  <>
+                    Confirm INR Remittance <ArrowUpRight className="h-3.5 w-3.5" />
+                  </>
+                )}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
-        {/* EXPORT MODAL */}
+        {/* ── Export Private Key Modal ─────────────────────────── */}
         <Dialog open={exportModalOpen} onOpenChange={setExportModalOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
