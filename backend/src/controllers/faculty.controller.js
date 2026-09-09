@@ -18,14 +18,34 @@ const listPendingStudents = async (req, res, next) => {
       throw new CustomError('Faculty only', 403, 'faculty_only');
     }
 
-    const snapshot = await db
-      .collection('users')
-      .where('role', '==', Roles.STUDENT)
-      .where('collegeId', '==', actor.collegeId)
-      .where('verificationStatus', '==', 'pending')
-      .get();
+    if (!actor.collegeId) {
+      throw new CustomError('No college assigned', 400, 'no_college_assigned');
+    }
 
-    const students = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const [pendingStatusSnap, pendingReviewSnap] = await Promise.all([
+      db
+        .collection('users')
+        .where('role', '==', Roles.STUDENT)
+        .where('collegeId', '==', actor.collegeId)
+        .where('verificationStatus', '==', 'pending')
+        .get(),
+      db
+        .collection('users')
+        .where('role', '==', Roles.STUDENT)
+        .where('collegeId', '==', actor.collegeId)
+        .where('idVerification.status', '==', 'pending_review')
+        .get(),
+    ]);
+
+    const studentMap = new Map();
+    pendingStatusSnap.docs.forEach((doc) => {
+      studentMap.set(doc.id, { id: doc.id, ...doc.data() });
+    });
+    pendingReviewSnap.docs.forEach((doc) => {
+      studentMap.set(doc.id, { id: doc.id, ...doc.data() });
+    });
+
+    const students = Array.from(studentMap.values());
 
     return ok(res, { students });
   } catch (error) {

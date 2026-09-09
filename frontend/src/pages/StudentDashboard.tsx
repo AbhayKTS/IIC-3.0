@@ -16,6 +16,8 @@ import {
 import { toast } from 'sonner';
 import CameraIdScanner from '@/components/CameraIdScanner';
 import CodingProfilesSection from '@/components/CodingProfilesSection';
+import { useLiveStudentVerification } from '@/lib/useLiveStudentVerification';
+import { StudentVerificationBadge } from '@/components/StudentVerificationBadge';
 import type { IdVerificationData, ResumeExtractionData, JobRecommendation, AppNotification, CodingProfiles } from '@/lib/types';
 import {
   CheckCircle2,
@@ -236,22 +238,28 @@ export default function StudentDashboard() {
     }
   };
 
-  const effectiveIdVerification = idResult || overview?.idVerification;
+  const liveStudent = useLiveStudentVerification(session?.userId);
+  const effectiveIdVerification = liveStudent.idVerification || idResult || overview?.idVerification;
 
-  const isIdVerified =
-    effectiveIdVerification?.status === 'VERIFIED' ||
-    effectiveIdVerification?.status === 'verified' ||
-    overview?.verificationStatus === 'verified' ||
-    Boolean(idResult);
+  const isIdVerified = liveStudent.isLoaded
+    ? liveStudent.status === 'verified'
+    : (effectiveIdVerification?.status === 'VERIFIED' ||
+       effectiveIdVerification?.status === 'verified' ||
+       overview?.verificationStatus === 'verified' ||
+       Boolean(idResult));
 
-  const isIdPending = false; // Direct verification, no pending review
+  const isIdPending = liveStudent.isLoaded
+    ? liveStudent.status === 'pending'
+    : false;
 
   const verificationStatus: 'verified' | 'pending' | 'rejected' | 'unverified' =
-    isIdVerified
-      ? 'verified'
-      : overview?.verificationStatus === 'rejected'
-        ? 'rejected'
-        : 'unverified';
+    liveStudent.isLoaded
+      ? liveStudent.status
+      : isIdVerified
+        ? 'verified'
+        : overview?.verificationStatus === 'rejected'
+          ? 'rejected'
+          : 'pending';
 
   const studentName = overview?.user?.name || overview?.profile?.name || session?.user?.name || 'Student';
   const studentEmail = overview?.user?.email || session?.user?.email || '';
@@ -298,26 +306,7 @@ export default function StudentDashboard() {
                   <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">
                     Good evening, {studentName}
                   </h1>
-                  {verificationStatus === 'verified' && (
-                    <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 gap-1.5 py-1 px-2.5">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Verified Student
-                    </Badge>
-                  )}
-                  {verificationStatus === 'pending' && (
-                    <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 gap-1.5 py-1 px-2.5">
-                      <Clock className="h-3.5 w-3.5" /> Verification Pending
-                    </Badge>
-                  )}
-                  {verificationStatus === 'rejected' && (
-                    <Badge className="bg-destructive/15 text-destructive border border-destructive/30 gap-1.5 py-1 px-2.5">
-                      <XCircle className="h-3.5 w-3.5" /> Verification Rejected
-                    </Badge>
-                  )}
-                  {verificationStatus === 'unverified' && (
-                    <Badge variant="outline" className="text-muted-foreground gap-1.5 py-1 px-2.5">
-                      <AlertCircle className="h-3.5 w-3.5" /> ID Not Verified
-                    </Badge>
-                  )}
+                  <StudentVerificationBadge uid={session?.userId} />
                 </div>
 
                 <div className="flex flex-wrap items-center gap-y-1 gap-x-6 text-sm text-muted-foreground">
@@ -395,12 +384,18 @@ export default function StudentDashboard() {
                     <h3 className="font-semibold text-foreground text-base flex items-center gap-2">
                       <ShieldCheck className="h-5 w-5 text-primary" /> College Verification
                     </h3>
-                    <Badge
-                      variant={isIdVerified ? 'default' : 'secondary'}
-                      className={isIdVerified ? 'bg-emerald-500 text-white' : ''}
-                    >
-                      {verificationStatus.toUpperCase()}
-                    </Badge>
+                    {!liveStudent.isLoaded ? (
+                      <Badge variant="outline" className="bg-secondary/40 text-muted-foreground/70 text-[10px] animate-pulse">
+                        SYNCING...
+                      </Badge>
+                    ) : (
+                      <Badge
+                        variant={isIdVerified ? 'default' : 'secondary'}
+                        className={isIdVerified ? 'bg-emerald-500 text-white' : ''}
+                      >
+                        {verificationStatus.toUpperCase()}
+                      </Badge>
+                    )}
                   </div>
 
                   <ul className="space-y-2 text-sm text-muted-foreground mt-3">

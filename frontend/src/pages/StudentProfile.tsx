@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { cleanHandle } from '@/lib/utils';
+import { StudentVerificationBadge } from '@/components/StudentVerificationBadge';
 import {
   Dialog,
   DialogContent,
@@ -298,9 +299,7 @@ export default function StudentProfile() {
                   <h1 className="text-xl font-bold text-foreground font-mono">
                     {profile?.name || (session?.user as any)?.name || 'Student Profile'}
                   </h1>
-                  <Badge className="bg-[#3DDC84]/15 text-[#3DDC84] border-[#3DDC84]/30 font-mono text-[11px]">
-                    Verified Student
-                  </Badge>
+                  <StudentVerificationBadge uid={session?.userId} />
                 </div>
                 <p className="text-xs text-muted-foreground font-mono mt-0.5">
                   {profile?.email || (session?.user as any)?.email}

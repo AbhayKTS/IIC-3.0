@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/mockApi';
 import DashboardLayout from '@/components/layout/DashboardLayout';
@@ -48,7 +50,71 @@ export default function CollegeVerification() {
   };
 
   useEffect(() => {
-    fetchPendingStudents();
+    const facultyUser = session?.user as any;
+    const facultyCollegeId = facultyUser?.collegeId || facultyUser?.college?.id || 'iitd';
+    if (!facultyCollegeId) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+
+    let mapPending = new Map<string, any>();
+    let mapPendingReview = new Map<string, any>();
+
+    const updateCombined = () => {
+      const combined = new Map<string, any>();
+      mapPending.forEach((val, key) => combined.set(key, val));
+      mapPendingReview.forEach((val, key) => combined.set(key, val));
+      setStudents(Array.from(combined.values()));
+      setLoading(false);
+    };
+
+    // Live subscription 1: verificationStatus == 'pending'
+    const q1 = query(
+      collection(db, 'users'),
+      where('role', '==', 'student'),
+      where('collegeId', '==', facultyCollegeId),
+      where('verificationStatus', '==', 'pending')
+    );
+
+    // Live subscription 2: idVerification.status == 'pending_review'
+    const q2 = query(
+      collection(db, 'users'),
+      where('role', '==', 'student'),
+      where('collegeId', '==', facultyCollegeId),
+      where('idVerification.status', '==', 'pending_review')
+    );
+
+    const unsub1 = onSnapshot(
+      q1,
+      (snapshot) => {
+        mapPending = new Map();
+        snapshot.docs.forEach((d) => mapPending.set(d.id, { id: d.id, ...d.data() }));
+        updateCombined();
+      },
+      (err) => {
+        console.warn('[CollegeVerification] pending listener warning:', err);
+        fetchPendingStudents();
+      }
+    );
+
+    const unsub2 = onSnapshot(
+      q2,
+      (snapshot) => {
+        mapPendingReview = new Map();
+        snapshot.docs.forEach((d) => mapPendingReview.set(d.id, { id: d.id, ...d.data() }));
+        updateCombined();
+      },
+      (err) => {
+        console.warn('[CollegeVerification] pending_review listener warning:', err);
+      }
+    );
+
+    return () => {
+      unsub1();
+      unsub2();
+    };
   }, [session]);
 
   const handleVerify = async (studentId: string, status: 'verified' | 'rejected') => {

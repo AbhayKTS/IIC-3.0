@@ -11,6 +11,7 @@ const { logAudit } = require('../services/audit.service');
 const { Roles } = require('../utils/roles');
 const { triggerN8nWorkflow } = require('../services/n8n.service');
 const { matchJobsForStudent } = require('../services/jobMatching.service');
+const { createNotification } = require('../services/notifications.service');
 const logger = require('../utils/logger');
 
 const PROFILE_LIMITS = {
@@ -269,6 +270,10 @@ const verifyIdCard = async (req, res, next) => {
       throw new CustomError('Student only', 403, 'student_only');
     }
 
+    if (!actor.collegeId) {
+      throw new CustomError('No college assigned', 400, 'no_college_assigned');
+    }
+
     if (!req.file || !req.file.buffer) {
       throw new CustomError('ID card image file is required', 400, 'file_required');
     }
@@ -359,6 +364,30 @@ const verifyIdCard = async (req, res, next) => {
       await db.collection('users').doc(actor.uid).set(userUpdate, { merge: true });
     } catch (err) {
       logger.warn('[verifyIdCard] Firestore user update warning:', err.message);
+    }
+
+    // Notify admin faculty of that specific college only
+    try {
+      const facultySnap = await db
+        .collection('users')
+        .where('role', '==', 'faculty')
+        .where('subRole', '==', 'adminFaculty')
+        .where('collegeId', '==', actor.collegeId)
+        .get();
+
+      const studentName = actor.name || actor.displayName || 'A student';
+      const notificationPromises = facultySnap.docs.map((facultyDoc) =>
+        createNotification({
+          userId: facultyDoc.id,
+          type: 'id_card_review',
+          title: 'New ID card verification request',
+          message: `${studentName} submitted an ID card for review`,
+          referenceId: actor.uid,
+        })
+      );
+      await Promise.all(notificationPromises);
+    } catch (notifErr) {
+      logger.warn('[verifyIdCard] Failed to create faculty notifications:', notifErr.message);
     }
 
     // Also update studentLeaderboard and studentProfiles so whole platform reflects verified status
