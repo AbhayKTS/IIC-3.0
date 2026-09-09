@@ -1,6 +1,8 @@
 const admin = require('../services/firebaseAdmin');
 const db = require('../services/firestore');
 const { ok } = require('../utils/response');
+const CustomError = require('../utils/CustomError');
+const blockedDomains = require('../config/blockedDomains');
 
 const getDoc = async (collection, id) => {
   const snap = await db.collection(collection).doc(id).get();
@@ -990,10 +992,39 @@ module.exports = {
       }
 
       if (role === 'student') {
+        const emailDomain = email.includes('@') ? email.split('@')[1].toLowerCase().trim() : '';
+
+        // Hard denylist check before college lookup
+        if (blockedDomains.includes(emailDomain)) {
+          throw new CustomError('Public email domains are not allowed for student registration', 400, 'public_domain_not_allowed');
+        }
+
         // Check college domain
         const colleges = await listDocs('colleges');
-        const college = colleges.find((c) => email.endsWith(`@${c.domain}`));
-        const resolvedCollegeId = college ? college.id : (collegeId || null);
+        const college = colleges.find((c) => {
+          if (!c.domain) return false;
+          const d = c.domain.toLowerCase().trim();
+          return emailDomain === d || email.toLowerCase().endsWith(`@${d}`);
+        });
+
+        let resolvedCollegeId = college ? college.id : null;
+
+        // If no matching college found by email domain, check if a valid collegeId was explicitly passed by super-admin flow
+        if (!resolvedCollegeId && collegeId) {
+          const matchingColById = colleges.find((c) => c.id === collegeId || (c.collegeId && c.collegeId === collegeId));
+          if (matchingColById) {
+            resolvedCollegeId = matchingColById.id;
+          } else {
+            const colDoc = await getDoc('colleges', collegeId);
+            if (colDoc) {
+              resolvedCollegeId = colDoc.id;
+            }
+          }
+        }
+
+        if (!resolvedCollegeId) {
+          throw new CustomError('No valid college found for this email domain', 400, 'college_domain_invalid');
+        }
 
         const existing = await db.collection('students').where('email', '==', email).limit(1).get();
         if (!existing.empty) {

@@ -74,7 +74,7 @@ describe('resumeParser.service', () => {
 
   describe('parseResumeData runtime detection', () => {
     it('uses Azure OpenAI when AZURE_OPENAI_ENDPOINT is configured', async () => {
-      process.env.AZURE_OPENAI_ENDPOINT = 'https://test-openai.openai.azure.com';
+      process.env.AZURE_OPENAI_ENDPOINT = 'https://test-openai.openai.azure.com/openai/v1';
       process.env.AZURE_OPENAI_KEY = 'test-openai-key';
       process.env.AZURE_OPENAI_DEPLOYMENT = 'gpt-4o-mini';
 
@@ -113,14 +113,18 @@ describe('resumeParser.service', () => {
       const result = await parseResumeData(rawText);
 
       expect(axios.post).toHaveBeenCalledWith(
-        expect.stringContaining('/openai/deployments/gpt-4o-mini/chat/completions'),
-        expect.anything(),
+        'https://test-openai.openai.azure.com/openai/v1/chat/completions?api-version=preview',
+        expect.objectContaining({
+          model: 'gpt-4o-mini',
+        }),
         expect.objectContaining({
           headers: expect.objectContaining({
             'api-key': 'test-openai-key',
           }),
         })
       );
+      const postUrl = axios.post.mock.calls[0][0];
+      expect(postUrl).not.toContain('/openai/deployments/');
 
       expect(result.method).toBe('azure-openai');
       expect(result.skills).toHaveLength(3);
@@ -143,7 +147,7 @@ describe('resumeParser.service', () => {
     });
 
     it('falls back to rule-based parsing when Azure OpenAI call fails', async () => {
-      process.env.AZURE_OPENAI_ENDPOINT = 'https://test-openai.openai.azure.com';
+      process.env.AZURE_OPENAI_ENDPOINT = 'https://test-openai.openai.azure.com/openai/v1';
       process.env.AZURE_OPENAI_KEY = 'test-openai-key';
 
       axios.post.mockRejectedValueOnce(new Error('Azure OpenAI rate limited (429)'));

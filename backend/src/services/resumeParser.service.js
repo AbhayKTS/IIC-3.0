@@ -140,7 +140,7 @@ const parseWithRules = (rawText) => {
 const parseWithAzureOpenAI = async (rawText, config) => {
   const truncated = (rawText || '').slice(0, MAX_RAW_TEXT_LENGTH);
   const endpoint = config.endpoint.replace(/\/+$/, '');
-  const url = `${endpoint}/openai/deployments/${config.deployment}/chat/completions?api-version=${OPENAI_API_VERSION}`;
+  const url = `${endpoint.replace(/\/+$/, '')}/chat/completions?api-version=preview`;
 
   const prompt = `You are an expert resume parser. Extract structured resume data from the text below and respond ONLY with a valid JSON object matching this exact schema:
 {
@@ -157,6 +157,7 @@ ${truncated}`;
   const response = await axios.post(
     url,
     {
+      model: config.deployment,
       messages: [
         {
           role: 'system',
