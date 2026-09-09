@@ -163,6 +163,15 @@ export interface Gig {
 export interface GigApplication {
   id: string; gigId: string; studentId: string;
   status: 'applied' | 'accepted' | 'rejected' | 'completed' | 'withdrawn';
+  studentName?: string;
+  studentCollege?: string;
+  studentSkills?: string[];
+  studentRating?: number;
+  studentAvatar?: string;
+  deliverableUrl?: string;
+  notes?: string;
+  submittedAt?: string;
+  appliedAt?: string;
 }
 
 export interface MarketplaceItem {
