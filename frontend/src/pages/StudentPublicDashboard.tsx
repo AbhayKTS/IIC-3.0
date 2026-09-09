@@ -106,7 +106,14 @@ export default function StudentPublicDashboard() {
 
   // Load demo student data (in a real app, fetch from Firestore by studentId)
   const [student, setStudent] = useState({ ...DEMO_STUDENT, id: studentId || session?.userId || DEMO_STUDENT.id });
-  const [walletAddress] = useState(() => generateWalletFromSeed(student.id));
+  const [walletAddress] = useState<string>(() => {
+    try {
+      const wallet = generateWalletFromSeed(student.id);
+      return wallet.address;
+    } catch {
+      return '0x0000000000000000000000000000000000000000';
+    }
+  });
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'credentials' | 'work'>('overview');
 
@@ -127,7 +134,7 @@ export default function StudentPublicDashboard() {
   const [sendingOffer, setSendingOffer] = useState(false);
 
   function handleCopyAddress() {
-    copyToClipboard(walletAddress);
+    copyToClipboard(typeof walletAddress === 'string' ? walletAddress : (walletAddress as any)?.address ?? '');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -185,7 +192,8 @@ export default function StudentPublicDashboard() {
     Academic: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
   };
 
-  const layoutRole = (viewerRole === 'student' ? 'student' : viewerRole === 'faculty' ? 'faculty' : 'recruiter') as 'student' | 'faculty' | 'recruiter';
+  const layoutRole: 'student' | 'faculty' | 'recruiter' =
+    viewerRole === 'faculty' ? 'faculty' : viewerRole === 'recruiter' ? 'recruiter' : 'student';
 
   return (
     <DashboardLayout role={layoutRole}>
