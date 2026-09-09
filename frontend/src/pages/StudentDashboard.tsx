@@ -43,6 +43,7 @@ import {
   Coins,
   Award,
   Lock,
+  Eye,
 } from 'lucide-react';
 
 interface StudentOverviewData {
@@ -362,6 +363,9 @@ export default function StudentDashboard() {
               </div>
 
               <div className="flex items-center gap-3 flex-shrink-0">
+                <Button variant="outline" size="sm" onClick={() => navigate('/student/public')} className="gap-2 text-xs">
+                  <Eye className="h-3.5 w-3.5" /> View as Public
+                </Button>
                 <Button variant="outline" onClick={() => navigate('/student/profile')} className="gap-2">
                   Edit Profile
                 </Button>

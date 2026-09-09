@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { api } from '@/lib/mockApi';
 import { useAuth } from '@/lib/auth';
@@ -12,7 +13,7 @@ import { toast } from 'sonner';
 import {
   Search, Users, Briefcase, Star, Code2, ShieldCheck,
   ExternalLink, UserCheck, ArrowRight, Filter, CheckCircle2,
-  DollarSign, MapPin, Building, Sparkles
+  DollarSign, MapPin, Building, Sparkles, Eye
 } from 'lucide-react';
 import { collection, addDoc, doc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -32,6 +33,7 @@ export default function RecruiterSearch() {
   const { session } = useAuth();
   const recruiterId = session?.userId || 'recruiter';
   const companyName = (session?.user as any)?.company || 'Corporate Partner';
+  const navigate = useNavigate();
 
   const [skills, setSkills] = useState('');
   const [minScore, setMinScore] = useState('');
@@ -325,6 +327,14 @@ export default function RecruiterSearch() {
                     </div>
 
                     <div className="pt-3 border-t border-border/40 flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => navigate(`/student/public/${student.userId}`)}
+                        className="text-xs gap-1.5 text-muted-foreground hover:text-primary font-mono"
+                      >
+                        <Eye className="h-3.5 w-3.5" /> Public Profile
+                      </Button>
                       <Button
                         size="sm"
                         variant="outline"

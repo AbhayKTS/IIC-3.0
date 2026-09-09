@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/mockApi';
@@ -20,7 +21,7 @@ import {
   Zap, Plus, CheckCircle2, ExternalLink, Star, Clock,
   ShieldCheck, Loader2, RefreshCw, Users, FileText,
   ArrowUpRight, Award, Check, Code2, AlertCircle, Search, Coins,
-  User, Mail, Sparkles, Shield
+  User, Mail, Sparkles, Shield, Lock, Unlock, Eye
 } from 'lucide-react';
 import { collection, addDoc, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -128,6 +129,7 @@ export default function RecruiterMicroGigs() {
   const recruiterId = session?.userId || 'recruiter';
   const recruiterName = session?.user?.name || (session?.user as any)?.company || 'Corporate Recruiter';
 
+  const navigate = useNavigate();
   const [gigs, setGigs] = useState<Gig[]>(SEED_RECRUITER_GIGS);
   const [applications, setApplications] = useState<GigApplication[]>(SEED_APPLICATIONS);
   const [loading, setLoading] = useState(false);
@@ -272,6 +274,28 @@ export default function RecruiterMicroGigs() {
     } catch (err: any) {
       toast.error(err.message || 'Failed to accept application');
     }
+  };
+
+  // Toggle gig open/closed status
+  const handleToggleGigStatus = async (gigId: string) => {
+    setGigs((prev) =>
+      prev.map((g) =>
+        g.id === gigId ? { ...g, status: g.status === 'open' ? 'closed' : 'open' } : g
+      )
+    );
+    const gig = gigs.find((g) => g.id === gigId);
+    const newStatus = gig?.status === 'open' ? 'closed' : 'open';
+    toast.success(
+      newStatus === 'closed'
+        ? '🔒 Gig closed. Students can no longer apply.'
+        : '🟢 Gig reopened. Students can apply again.'
+    );
+    // Persist to Firestore if gig has a Firestore doc ID
+    try {
+      const q = query(collection(db, 'gigs'), where('localId', '==', gigId));
+      const snap = await getDocs(q);
+      snap.forEach(async (d) => { await updateDoc(doc(db, 'gigs', d.id), { status: newStatus }); });
+    } catch (_) {}
   };
 
   // Handle Review & Release Payout (in Polygon POL)
@@ -478,6 +502,15 @@ export default function RecruiterMicroGigs() {
                           <Badge variant="outline" className="text-[10px] font-mono capitalize border-border text-foreground">
                             {gig.mode}
                           </Badge>
+                          {gig.status === 'closed' ? (
+                            <Badge className="text-[10px] font-mono bg-rose-500/15 text-rose-400 border border-rose-500/30 gap-1">
+                              <Lock className="h-2.5 w-2.5" /> Closed
+                            </Badge>
+                          ) : (
+                            <Badge className="text-[10px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 gap-1">
+                              <Zap className="h-2.5 w-2.5" /> Open
+                            </Badge>
+                          )}
                         </div>
                         <div className="text-right">
                           <span className="text-lg font-extrabold font-mono text-purple-700 dark:text-purple-400">
@@ -531,17 +564,36 @@ export default function RecruiterMicroGigs() {
                         </Badge>
                       </div>
 
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          setSelectedGigForApplicants(gig);
-                          setApplicantsModalOpen(true);
-                        }}
-                        className="font-mono text-xs gap-1.5 shadow-sm"
-                      >
-                        <Users className="h-3.5 w-3.5" />
-                        View Applicants ({gigApps.length})
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleToggleGigStatus(gig.id)}
+                          className={`font-mono text-xs gap-1.5 ${
+                            gig.status === 'open'
+                              ? 'border-rose-500/40 text-rose-400 hover:bg-rose-500/10'
+                              : 'border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10'
+                          }`}
+                        >
+                          {gig.status === 'open' ? (
+                            <><Lock className="h-3.5 w-3.5" /> Close Gig</>
+                          ) : (
+                            <><Unlock className="h-3.5 w-3.5" /> Reopen Gig</>
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setSelectedGigForApplicants(gig);
+                            setApplicantsModalOpen(true);
+                          }}
+                          className="font-mono text-xs gap-1.5 shadow-sm"
+                          disabled={gig.status === 'closed' && gigApps.length === 0}
+                        >
+                          <Users className="h-3.5 w-3.5" />
+                          View Applicants ({gigApps.length})
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -742,6 +794,14 @@ export default function RecruiterMicroGigs() {
                       </div>
 
                       <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => navigate(`/student/public/${app.studentId}`)}
+                          className="font-mono text-xs h-7 gap-1 text-muted-foreground hover:text-primary"
+                        >
+                          <Eye className="h-3 w-3" /> Public Profile
+                        </Button>
                         <Button
                           size="sm"
                           variant="outline"

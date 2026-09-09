@@ -27,6 +27,7 @@ import StudentLeaderboard from './pages/StudentLeaderboard';
 import StudentTransactions from './pages/StudentTransactions';
 import StudentPlacements from './pages/StudentPlacements';
 import StudentCourses from './pages/StudentCourses';
+import StudentPublicDashboard from './pages/StudentPublicDashboard';
 
 // College Pages
 import CollegeDashboard from './pages/CollegeDashboard';
@@ -84,6 +85,8 @@ const App = () => (
             <Route path="/student/transactions" element={<RequireAuth role="student"><StudentTransactions /></RequireAuth>} />
             <Route path="/student/placements" element={<RequireAuth role="student"><StudentPlacements /></RequireAuth>} />
             <Route path="/student/leaderboard" element={<RequireAuth role="student"><StudentLeaderboard /></RequireAuth>} />
+            <Route path="/student/public" element={<RequireAuth role="student"><StudentPublicDashboard /></RequireAuth>} />
+            <Route path="/student/public/:studentId" element={<StudentPublicDashboard />} />
 
             {/* College Routes */}
             <Route path="/college/dashboard" element={<RequireAuth role="faculty"><CollegeDashboard /></RequireAuth>} />

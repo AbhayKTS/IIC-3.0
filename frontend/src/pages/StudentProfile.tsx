@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/mockApi';
 import type { Student, ResumeExtractionData, ExtractedSkill } from '@/lib/types';
@@ -37,10 +38,12 @@ import {
   Shield,
   Code2,
   ExternalLink,
+  Eye,
 } from 'lucide-react';
 
 export default function StudentProfile() {
   const { session } = useAuth();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState<Student | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -337,6 +340,9 @@ export default function StudentProfile() {
             </div>
 
             <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => navigate('/student/public')} className="gap-1.5 font-mono text-xs">
+                <Eye className="h-3.5 w-3.5" /> View as Public
+              </Button>
               {/* Edit Details Dialog */}
               <Dialog open={isEditDetailsOpen} onOpenChange={setIsEditDetailsOpen}>
                 <DialogTrigger asChild>

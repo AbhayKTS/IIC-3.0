@@ -12,7 +12,7 @@ import {
 import { toast } from 'sonner';
 import {
   Zap, Search, DollarSign, Clock, Briefcase, CheckCircle2,
-  ExternalLink, Award, Filter, Layers, Send, Building, Star, Coins, ShieldCheck,
+  ExternalLink, Award, Filter, Layers, Send, Building, Star, Coins, ShieldCheck, Lock,
 } from 'lucide-react';
 import { generateWalletFromSeed, simulateGigPayout, explorerTxUrl, saveTxRecord } from '@/lib/web3';
 
@@ -410,7 +410,11 @@ export default function StudentMicroGigs() {
                       </span>
                     </div>
 
-                    {hasApplied ? (
+                    {gig.status === 'closed' ? (
+                      <Badge className="bg-rose-500/10 text-rose-400 border-rose-500/30 gap-1 font-mono text-[11px]">
+                        <Lock className="h-3 w-3" /> Applications Closed
+                      </Badge>
+                    ) : hasApplied ? (
                       <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/30 gap-1">
                         <CheckCircle2 className="h-3 w-3" /> Applied
                       </Badge>

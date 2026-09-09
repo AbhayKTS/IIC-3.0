@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
@@ -29,6 +30,7 @@ import {
 
 export default function CollegeVerification() {
   const { session } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'id-cards' | 'achievements'>('id-cards');
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -352,6 +354,14 @@ export default function CollegeVerification() {
                         <Button
                           size="sm"
                           variant="ghost"
+                          onClick={() => navigate(`/student/public/${studentId}`)}
+                          className="text-muted-foreground hover:text-primary font-mono text-xs gap-1"
+                        >
+                          <Eye className="h-3.5 w-3.5" /> Public Dashboard
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
                           disabled={processingId === studentId}
                           onClick={() => handleVerify(studentId, 'rejected')}
                           className="text-muted-foreground hover:text-red-400 hover:bg-red-500/10 font-mono text-xs"
@@ -495,6 +505,14 @@ export default function CollegeVerification() {
                     </div>
 
                     <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => navigate(`/student/public/${ach.studentRoll}`)}
+                        className="text-muted-foreground hover:text-primary font-mono text-xs gap-1"
+                      >
+                        <Eye className="h-3.5 w-3.5" /> Public Dashboard
+                      </Button>
                       <Button
                         size="sm"
                         variant="ghost"
