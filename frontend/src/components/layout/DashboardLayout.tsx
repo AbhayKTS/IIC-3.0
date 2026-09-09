@@ -24,11 +24,13 @@ const collegeNav: NavItem[] = [
   { label: 'College Profile', href: '/college/profile', icon: <Building2 className="h-4 w-4" /> },
   { label: 'Verification', href: '/college/verification', icon: <Shield className="h-4 w-4" /> },
   { label: 'Recruiters', href: '/college/recruiters', icon: <Briefcase className="h-4 w-4" /> },
+  { label: 'Analytics', href: '/college/analytics', icon: <Trophy className="h-4 w-4" /> },
 ];
 
 const recruiterNav: NavItem[] = [
   { label: 'Dashboard', href: '/recruiter/dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
   { label: 'Company Profile', href: '/recruiter/profile', icon: <User className="h-4 w-4" /> },
+  { label: 'Search Talent', href: '/recruiter/search', icon: <Layers className="h-4 w-4" /> },
   { label: 'MicroGigs', href: '/recruiter/microgigs', icon: <Zap className="h-4 w-4" /> },
 ];
 

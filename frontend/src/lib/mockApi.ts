@@ -403,6 +403,9 @@ export const api = {
   async getVerifiedStudents(): Promise<Student[]> {
     return request('/compat/students/verified');
   },
+  async searchStudents(params: URLSearchParams): Promise<{ results: any[]; nextCursor: string | null }> {
+    return request(`/recruiter/search?${params.toString()}`, { auth: true });
+  },
 
   async getStudentOverview(): Promise<{
     uid: string;

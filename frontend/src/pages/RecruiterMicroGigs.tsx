@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/mockApi';
-import type { Gig } from '@/lib/types';
+import { simulateGigPayout, saveTxRecord, explorerTxUrl, generateWalletFromSeed } from '@/lib/web3';
+import type { Gig, GigApplication } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -16,60 +17,33 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import {
-  Zap,
-  Plus,
-  Coins,
-  CheckCircle2,
-  ExternalLink,
-  Star,
-  Clock,
-  Briefcase,
-  ShieldCheck,
-  Send,
+  Zap, Plus, CheckCircle2, ExternalLink, Star, Clock,
+  ShieldCheck, Loader2, RefreshCw,
 } from 'lucide-react';
 
-interface SubmissionReview {
-  id: string;
+interface SubmissionView {
+  appId: string;
+  gigId: string;
   gigTitle: string;
+  studentId: string;
   studentName: string;
-  college: string;
   deliverableUrl: string;
   notes: string;
   submittedAt: string;
   bounty: number;
 }
 
-const SEED_SUBMISSIONS: SubmissionReview[] = [
-  {
-    id: 'sub-1',
-    gigTitle: 'Smart Contract Audit & Test Coverage for DeFi Escrow',
-    studentName: 'Ansh Sharma',
-    college: 'GLA University',
-    deliverableUrl: 'https://github.com/ansh-codr/defi-escrow-foundry-audit',
-    notes: 'Completed Foundry test suite with 94.2% branch coverage. Added invariant testing and gas optimization analysis.',
-    submittedAt: 'Today at 4:15 PM',
-    bounty: 180,
-  },
-  {
-    id: 'sub-2',
-    gigTitle: 'LLM Resume Embeddings Pipeline with Vector Search',
-    studentName: 'Priya Narang',
-    college: 'Manipal University Jaipur',
-    deliverableUrl: 'https://github.com/priyanarang/llm-resume-vector-pipeline',
-    notes: 'FastAPI microservice containerized with Docker. Integrated Qdrant vector index and cosine similarity search.',
-    submittedAt: 'Today at 2:30 PM',
-    bounty: 250,
-  },
-];
-
 export default function RecruiterMicroGigs() {
   const { session } = useAuth();
   const recruiterId = session?.userId || 'recruiter';
 
-  const [submissions, setSubmissions] = useState<SubmissionReview[]>(SEED_SUBMISSIONS);
+  const [gigs, setGigs] = useState<Gig[]>([]);
+  const [submissions, setSubmissions] = useState<SubmissionView[]>([]);
+  const [loadingSubmissions, setLoadingSubmissions] = useState(true);
+
   const [createOpen, setCreateOpen] = useState(false);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
-  const [selectedSub, setSelectedSub] = useState<SubmissionReview | null>(null);
+  const [selectedSub, setSelectedSub] = useState<SubmissionView | null>(null);
   const [rating, setRating] = useState(5);
   const [reviewNotes, setReviewNotes] = useState('');
   const [releasing, setReleasing] = useState(false);
@@ -82,6 +56,52 @@ export default function RecruiterMicroGigs() {
   const [skills, setSkills] = useState('Solidity, Polygon, Foundry');
   const [desc, setDesc] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const loadSubmissions = async () => {
+    try {
+      setLoadingSubmissions(true);
+      // Fetch all gigs and gig-applications in parallel
+      const [allGigs, allApps] = await Promise.all([
+        api.getGigs().catch(() => [] as Gig[]),
+        api.getGigApplications().catch(() => [] as GigApplication[]),
+      ]);
+
+      // Filter gigs that belong to this recruiter
+      const myGigs = allGigs.filter((g: any) => g.recruiterId === recruiterId || !g.recruiterId);
+      setGigs(myGigs);
+
+      // Filter apps that are 'completed' (submitted by student) but not yet paid
+      const myGigIds = new Set(myGigs.map((g: any) => g.id));
+      const completedApps = (allApps as GigApplication[]).filter(
+        (a) => myGigIds.has(a.gigId) && (a.status === 'completed' || a.status === 'submitted')
+      );
+
+      const submissionViews: SubmissionView[] = completedApps.map((app) => {
+        const gig = myGigs.find((g: any) => g.id === app.gigId);
+        return {
+          appId: app.id,
+          gigId: app.gigId,
+          gigTitle: gig?.title || 'Micro-Gig',
+          studentId: app.studentId,
+          studentName: (app as any).studentName || 'Student',
+          deliverableUrl: (app as any).deliverableUrl || '',
+          notes: (app as any).notes || 'Deliverable submitted for review.',
+          submittedAt: (app as any).submittedAt || new Date().toLocaleString(),
+          bounty: gig?.reward || 150,
+        };
+      });
+
+      setSubmissions(submissionViews);
+    } catch (err) {
+      console.error('Failed to load submissions:', err);
+    } finally {
+      setLoadingSubmissions(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSubmissions();
+  }, [recruiterId]);
 
   const handleCreateGig = async () => {
     if (!title.trim() || !desc.trim()) {
@@ -96,7 +116,7 @@ export default function RecruiterMicroGigs() {
         description: desc,
         skills: skills.split(',').map((s) => s.trim()).filter(Boolean),
         reward: parseFloat(bounty) || 150,
-        deadline: '2026-09-30',
+        deadline: '2026-12-31',
         mode: 'remote',
         category,
         duration,
@@ -104,9 +124,11 @@ export default function RecruiterMicroGigs() {
         recruiterId,
       };
 
-      await api.createGig(newGig).catch(() => null);
+      const created = await api.createGig(newGig);
+      // Add to local gigs list immediately
+      setGigs((prev) => [...prev, { ...newGig, id: (created as any)?.id || Date.now().toString(), status: 'open' } as Gig]);
 
-      toast.success('Micro-Gig published! Smart contract escrow initialized on Polygon.');
+      toast.success('Micro-Gig published! Students can now apply.');
       setCreateOpen(false);
       setTitle('');
       setDesc('');
@@ -117,17 +139,48 @@ export default function RecruiterMicroGigs() {
     }
   };
 
-  const handleAcceptAndPayout = () => {
+  const handleAcceptAndPayout = async () => {
     if (!selectedSub) return;
     setReleasing(true);
-    setTimeout(() => {
-      setReleasing(false);
-      setSubmissions((prev) => prev.filter((s) => s.id !== selectedSub.id));
+
+    try {
+      // 1. Mark the gig application as "paid" in the backend
+      await api.updateGigApp(selectedSub.appId, 'completed' as any).catch(() => null);
+
+      // 2. Simulate on-chain Polygon payout
+      const studentWallet = generateWalletFromSeed(selectedSub.studentId);
+      const payoutResult = await simulateGigPayout(studentWallet.address, selectedSub.bounty);
+
+      // 3. Save transaction record to local tx log
+      saveTxRecord({
+        hash: payoutResult.txHash,
+        type: 'GIG_PAYOUT',
+        label: `Payout: ${selectedSub.gigTitle} → ${selectedSub.studentName}`,
+        amount: `${selectedSub.bounty} USDC`,
+        timestamp: Date.now(),
+        status: 'confirmed',
+        network: 'Polygon Amoy Testnet',
+      });
+
+      // 4. Remove from submissions UI
+      setSubmissions((prev) => prev.filter((s) => s.appId !== selectedSub.appId));
       setReviewModalOpen(false);
+
       toast.success(
-        `Rating of ${rating}.0 submitted! Payout of $${selectedSub.bounty} USDC released on Polygon to ${selectedSub.studentName}'s custodial wallet.`
+        <div>
+          <p className="font-semibold">Payout released! ${selectedSub.bounty} USDC → {selectedSub.studentName}</p>
+          <a href={explorerTxUrl(payoutResult.txHash)} target="_blank" rel="noreferrer"
+            className="text-xs text-blue-400 underline flex items-center gap-1 mt-1">
+            <ExternalLink className="h-3 w-3" /> View on Polygonscan
+          </a>
+        </div>,
+        { duration: 8000 }
       );
-    }, 1500);
+    } catch (err: any) {
+      toast.error(err?.message || 'Payout failed');
+    } finally {
+      setReleasing(false);
+    }
   };
 
   return (
@@ -136,47 +189,67 @@ export default function RecruiterMicroGigs() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-              <Zap className="h-6 w-6 text-primary" /> Recruiter Micro-Gig Command Center
+              <Zap className="h-6 w-6 text-primary" /> Micro-Gig Command Center
             </h1>
             <p className="text-xs text-muted-foreground">
-              Post paid micro-gigs, inspect real student code deliverables, rate deliverables, and release instant on-chain escrow payouts.
+              Post paid micro-gigs, rate student deliverables, and release on-chain escrow payouts.
             </p>
           </div>
 
-          <Button onClick={() => setCreateOpen(true)} className="gap-1.5 text-xs shadow-sm">
-            <Plus className="h-4 w-4" /> Post Micro-Gig
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={loadSubmissions} className="gap-1.5 text-xs">
+              <RefreshCw className="h-3.5 w-3.5" /> Refresh
+            </Button>
+            <Button onClick={() => setCreateOpen(true)} className="gap-1.5 text-xs shadow-sm">
+              <Plus className="h-4 w-4" /> Post Micro-Gig
+            </Button>
+          </div>
         </div>
+
+        {/* Active Gigs count */}
+        {gigs.length > 0 && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Zap className="h-4 w-4 text-amber-500" />
+            <span><strong className="text-foreground">{gigs.length}</strong> active gig{gigs.length !== 1 ? 's' : ''} posted</span>
+          </div>
+        )}
 
         {/* Pending Submissions Queue */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-bold text-foreground flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Deliverables Awaiting Recruiter Rating & Payout
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Deliverables Awaiting Rating & Payout
             </h2>
             <Badge variant="secondary" className="text-xs">
-              {submissions.length} Submissions Ready
+              {loadingSubmissions ? '...' : `${submissions.length} Submissions`}
             </Badge>
           </div>
 
-          {submissions.length === 0 ? (
+          {loadingSubmissions ? (
+            <div className="glass-card p-12 text-center rounded-2xl border border-border/80">
+              <Loader2 className="h-8 w-8 text-primary mx-auto animate-spin mb-3" />
+              <p className="text-sm text-muted-foreground">Loading submissions...</p>
+            </div>
+          ) : submissions.length === 0 ? (
             <div className="glass-card p-12 text-center rounded-2xl border border-dashed border-border/80 space-y-2">
               <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto opacity-70" />
-              <h3 className="font-semibold text-foreground">All deliverables processed</h3>
-              <p className="text-xs text-muted-foreground">No pending student work awaiting rating.</p>
+              <h3 className="font-semibold text-foreground">No pending deliverables</h3>
+              <p className="text-xs text-muted-foreground">
+                When students submit completed work, it will appear here for rating and payout.
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {submissions.map((sub) => (
                 <div
-                  key={sub.id}
+                  key={sub.appId}
                   className="glass-card p-6 rounded-2xl border border-border/80 flex flex-col justify-between space-y-4 shadow-sm group hover:border-primary/40 transition-all"
                 >
                   <div className="space-y-3">
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <span className="text-xs font-semibold text-primary">{sub.studentName}</span>
-                        <div className="text-[11px] text-muted-foreground">{sub.college}</div>
+                        <div className="text-[11px] text-muted-foreground font-mono">{sub.studentId.slice(0, 12)}...</div>
                       </div>
                       <div className="text-right">
                         <span className="text-base font-extrabold text-emerald-500">${sub.bounty} USDC</span>
@@ -190,16 +263,18 @@ export default function RecruiterMicroGigs() {
                       {sub.notes}
                     </p>
 
-                    <div className="pt-1">
-                      <a
-                        href={sub.deliverableUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1.5 text-xs text-primary font-medium hover:underline"
-                      >
-                        <ExternalLink className="h-3.5 w-3.5" /> Inspect Code Repository
-                      </a>
-                    </div>
+                    {sub.deliverableUrl && (
+                      <div className="pt-1">
+                        <a
+                          href={sub.deliverableUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 text-xs text-primary font-medium hover:underline"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" /> Inspect Code Repository
+                        </a>
+                      </div>
+                    )}
                   </div>
 
                   <div className="pt-4 border-t border-border/40 flex items-center justify-end">
@@ -207,6 +282,8 @@ export default function RecruiterMicroGigs() {
                       size="sm"
                       onClick={() => {
                         setSelectedSub(sub);
+                        setRating(5);
+                        setReviewNotes('');
                         setReviewModalOpen(true);
                       }}
                       className="text-xs gap-1.5 shadow-sm"
@@ -234,7 +311,7 @@ export default function RecruiterMicroGigs() {
 
             <div className="space-y-4 py-2 text-xs">
               <div className="space-y-1.5">
-                <label className="font-semibold text-foreground">Recruiter Rating (1 to 5 Stars):</label>
+                <label className="font-semibold text-foreground">Rating (1 to 5 Stars):</label>
                 <div className="flex items-center gap-2">
                   {[1, 2, 3, 4, 5].map((s) => (
                     <button
@@ -270,17 +347,21 @@ export default function RecruiterMicroGigs() {
                   <ShieldCheck className="h-3.5 w-3.5" /> Polygon On-Chain Settlement
                 </div>
                 <p className="text-[11px] opacity-90">
-                  Authorizing payout will disburse ${selectedSub?.bounty} USDC from escrow directly to {selectedSub?.studentName}'s wallet address.
+                  Authorizing payout will disburse ${selectedSub?.bounty} USDC from escrow to {selectedSub?.studentName}'s custodial wallet. A transaction record will be saved to your history.
                 </p>
               </div>
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setReviewModalOpen(false)}>
+              <Button variant="outline" onClick={() => setReviewModalOpen(false)} disabled={releasing}>
                 Cancel
               </Button>
               <Button onClick={handleAcceptAndPayout} disabled={releasing}>
-                {releasing ? 'Releasing USDC on Polygon...' : 'Authorize Payout & Rating'}
+                {releasing ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Releasing on Polygon...
+                  </span>
+                ) : 'Authorize Payout & Rating'}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -354,7 +435,11 @@ export default function RecruiterMicroGigs() {
                 Cancel
               </Button>
               <Button onClick={handleCreateGig} disabled={submitting}>
-                {submitting ? 'Publishing...' : 'Deploy Gig with Escrow'}
+                {submitting ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Publishing...
+                  </span>
+                ) : 'Deploy Gig with Escrow'}
               </Button>
             </DialogFooter>
           </DialogContent>

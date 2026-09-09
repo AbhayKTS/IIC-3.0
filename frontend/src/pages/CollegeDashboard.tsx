@@ -27,25 +27,52 @@ export default function CollegeDashboard() {
   const { session } = useAuth();
   const navigate = useNavigate();
   const facultyName = session?.user?.name || (session?.user as any)?.email?.split('@')[0] || 'Dean of Engineering';
-  const collegeName = (session?.user as any)?.collegeName || 'Manipal University Jaipur (MUJ)';
+  const collegeName = (session?.user as any)?.collegeName || 'Your College';
+  const collegeId = (session?.user as any)?.collegeId || '';
 
-  const [pendingCount, setPendingCount] = useState(3);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [verifiedCount, setVerifiedCount] = useState(0);
+  const [openGigsCount, setOpenGigsCount] = useState(0);
+  const [recruiterCount, setRecruiterCount] = useState(0);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    loadPendingCount();
+    loadStats();
   }, []);
 
-  const loadPendingCount = async () => {
+  const loadStats = async () => {
+    setLoading(true);
     try {
-      const res = await api.getFacultyPendingStudents().catch(() => null);
-      if (res && Array.isArray(res.students)) {
-        setPendingCount(res.students.length);
+      const [pendingRes, verifiedRes, gigs] = await Promise.all([
+        api.getFacultyPendingStudents().catch(() => null),
+        api.getVerifiedStudents().catch(() => []),
+        api.getGigs().catch(() => []),
+      ]);
+
+      if (pendingRes && Array.isArray(pendingRes.students)) {
+        setPendingCount(pendingRes.students.length);
       }
+
+      const verifiedList = Array.isArray(verifiedRes) ? verifiedRes : [];
+      const myVerified = collegeId
+        ? verifiedList.filter((s: any) => s.collegeId === collegeId)
+        : verifiedList;
+      setVerifiedCount(myVerified.length);
+
+      const openGigs = Array.isArray(gigs) ? gigs.filter((g: any) => g.status === 'open' || !g.status) : [];
+      setOpenGigsCount(openGigs.length);
+
+      // Recruiter count: try shortlist for a rough count
+      const shortlist = await api.getShortlist('').catch(() => []);
+      const uniqueRecruiters = new Set((Array.isArray(shortlist) ? shortlist : []).map((s: any) => s.recruiterId).filter(Boolean));
+      setRecruiterCount(uniqueRecruiters.size || 0);
     } catch {
-      // Keep default
+      // Keep defaults
+    } finally {
+      setLoading(false);
     }
   };
+
 
   return (
     <DashboardLayout role="faculty">
@@ -84,9 +111,9 @@ export default function CollegeDashboard() {
               <span>Verified Student Roster</span>
               <ShieldCheck className="h-4 w-4 text-emerald-500" />
             </div>
-            <div className="text-2xl font-black text-foreground">1,842</div>
+            <div className="text-2xl font-black text-foreground">{verifiedCount}</div>
             <div className="text-[11px] text-emerald-500 font-medium flex items-center gap-1">
-              <CheckCircle2 className="h-3 w-3" /> 98.4% Zero-Fraud Identity Rate
+              <CheckCircle2 className="h-3 w-3" /> SBT-verified identities
             </div>
           </div>
 
@@ -106,9 +133,9 @@ export default function CollegeDashboard() {
               <span>Active Micro-Gigs</span>
               <Award className="h-4 w-4 text-amber-500" />
             </div>
-            <div className="text-2xl font-black text-amber-500">28 Open</div>
+            <div className="text-2xl font-black text-amber-500">{openGigsCount} Open</div>
             <div className="text-[11px] text-muted-foreground font-medium">
-              $14,200 USDC total student bounties
+              Live from recruiter postings
             </div>
           </div>
 
@@ -117,9 +144,9 @@ export default function CollegeDashboard() {
               <span>Partner Recruiters</span>
               <Briefcase className="h-4 w-4 text-violet-500" />
             </div>
-            <div className="text-2xl font-black text-violet-400">42 Companies</div>
+            <div className="text-2xl font-black text-violet-400">{recruiterCount} Companies</div>
             <div className="text-[11px] text-emerald-500 font-medium">
-              Including Polygon Labs, Microsoft, CRED
+              Active shortlisting activity
             </div>
           </div>
         </div>

@@ -37,6 +37,8 @@ import CollegeRecruiters from './pages/CollegeRecruiters';
 import RecruiterDashboard from './pages/RecruiterDashboard';
 import RecruiterProfile from './pages/RecruiterProfile';
 import RecruiterMicroGigs from './pages/RecruiterMicroGigs';
+import RecruiterSearch from './pages/RecruiterSearch';
+import CollegeAnalytics from './pages/CollegeAnalytics';
 
 const queryClient = new QueryClient();
 
@@ -81,11 +83,13 @@ const App = () => (
             <Route path="/college/profile" element={<RequireAuth role="faculty"><CollegeProfile /></RequireAuth>} />
             <Route path="/college/verification" element={<RequireAuth role="faculty"><CollegeVerification /></RequireAuth>} />
             <Route path="/college/recruiters" element={<RequireAuth role="faculty"><CollegeRecruiters /></RequireAuth>} />
+            <Route path="/college/analytics" element={<RequireAuth role="faculty"><CollegeAnalytics /></RequireAuth>} />
 
             {/* Recruiter Routes */}
             <Route path="/recruiter/dashboard" element={<RequireAuth role="recruiter"><RecruiterDashboard /></RequireAuth>} />
             <Route path="/recruiter/profile" element={<RequireAuth role="recruiter"><RecruiterProfile /></RequireAuth>} />
             <Route path="/recruiter/microgigs" element={<RequireAuth role="recruiter"><RecruiterMicroGigs /></RequireAuth>} />
+            <Route path="/recruiter/search" element={<RequireAuth role="recruiter"><RecruiterSearch /></RequireAuth>} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>
