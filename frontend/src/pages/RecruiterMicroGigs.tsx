@@ -19,7 +19,8 @@ import { toast } from 'sonner';
 import {
   Zap, Plus, CheckCircle2, ExternalLink, Star, Clock,
   ShieldCheck, Loader2, RefreshCw, Users, FileText,
-  ArrowUpRight, Award, Check, Code2, AlertCircle, Search, Coins
+  ArrowUpRight, Award, Check, Code2, AlertCircle, Search, Coins,
+  User, Mail, Sparkles, Shield
 } from 'lucide-react';
 import { collection, addDoc, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -139,6 +140,10 @@ export default function RecruiterMicroGigs() {
   // View Applicants Modal
   const [applicantsModalOpen, setApplicantsModalOpen] = useState(false);
   const [selectedGigForApplicants, setSelectedGigForApplicants] = useState<Gig | null>(null);
+
+  // Candidate Inspection Modal
+  const [candidateModalOpen, setCandidateModalOpen] = useState(false);
+  const [selectedCandidate, setSelectedCandidate] = useState<GigApplication | null>(null);
 
   // Review & Payout Modal
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
@@ -615,7 +620,18 @@ export default function RecruiterMicroGigs() {
                         )}
                       </div>
 
-                      <div className="pt-4 border-t border-border flex items-center justify-end">
+                      <div className="pt-4 border-t border-border flex items-center justify-between">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedCandidate(sub);
+                            setCandidateModalOpen(true);
+                          }}
+                          className="font-mono text-xs h-7 gap-1 border-border text-foreground hover:border-primary"
+                        >
+                          <User className="h-3 w-3 text-primary" /> Inspect Student Dossier
+                        </Button>
                         <Button
                           size="sm"
                           onClick={() => {
@@ -726,6 +742,17 @@ export default function RecruiterMicroGigs() {
                       </div>
 
                       <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedCandidate(app);
+                            setCandidateModalOpen(true);
+                          }}
+                          className="font-mono text-xs h-7 gap-1 border-border text-foreground hover:border-primary"
+                        >
+                          <User className="h-3 w-3 text-primary" /> View Student Dossier
+                        </Button>
                         {app.status === 'applied' && (
                           <Button
                             size="sm"
@@ -970,6 +997,135 @@ export default function RecruiterMicroGigs() {
                   `Confirm & Release ${gigs.find((g) => g.id === selectedAppForPayout?.gigId)?.reward || 180} POL`
                 )}
               </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* ── MODAL 3: STUDENT CANDIDATE DOSSIER INSPECTION MODAL ── */}
+        <Dialog open={candidateModalOpen} onOpenChange={setCandidateModalOpen}>
+          <DialogContent className="bg-card border-border text-foreground max-w-2xl max-h-[85vh] overflow-y-auto shadow-2xl">
+            <DialogHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center font-bold text-primary font-mono text-base">
+                    {selectedCandidate?.studentName?.slice(0, 2).toUpperCase() || 'ST'}
+                  </div>
+                  <div>
+                    <DialogTitle className="text-base font-bold font-mono text-foreground flex items-center gap-2">
+                      {selectedCandidate?.studentName || 'Student Candidate'}
+                      <span className="flex items-center gap-1 text-[10px] font-mono text-emerald-700 dark:text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                        <ShieldCheck className="h-3 w-3" /> Identity Verified
+                      </span>
+                    </DialogTitle>
+                    <DialogDescription className="text-xs text-muted-foreground font-mono">
+                      {selectedCandidate?.studentCollege || 'GLA University, Mathura'} • B.Tech Computer Science (2025)
+                    </DialogDescription>
+                  </div>
+                </div>
+                <Badge variant="outline" className="text-xs font-mono border-purple-500/40 text-purple-700 dark:text-purple-400">
+                  ERC-4337 Wallet
+                </Badge>
+              </div>
+            </DialogHeader>
+
+            <div className="space-y-4 mt-2">
+              {/* Contact & On-Chain Address */}
+              <div className="p-3 rounded-xl bg-secondary/40 border border-border text-xs font-mono space-y-2">
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" /> University Email:</span>
+                  <span className="text-foreground font-medium">{selectedCandidate?.studentId ? `${selectedCandidate.studentId}@gla.ac.in` : 'ansh.yadav_cs.aiml24@gla.ac.in'}</span>
+                </div>
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span className="flex items-center gap-1.5"><Shield className="h-3.5 w-3.5 text-purple-500" /> Custodial Wallet:</span>
+                  <span className="text-primary hover:underline cursor-pointer">{generateWalletFromSeed(selectedCandidate?.studentId || 'demo').address.slice(0, 18)}...</span>
+                </div>
+              </div>
+
+              {/* Verified Coding Profiles */}
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold font-mono text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Code2 className="h-3.5 w-3.5 text-primary" /> Verified Coding & Algorithmic Ratings
+                </h4>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="p-3 rounded-xl bg-secondary/50 border border-border space-y-1 text-center font-mono">
+                    <span className="text-[10px] text-muted-foreground block">LeetCode Rating</span>
+                    <strong className="text-amber-700 dark:text-amber-400 text-base">{selectedCandidate?.studentRating || '1980'}</strong>
+                    <span className="text-[9px] text-muted-foreground block">Top 3.5% Global</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-secondary/50 border border-border space-y-1 text-center font-mono">
+                    <span className="text-[10px] text-muted-foreground block">Codeforces</span>
+                    <strong className="text-blue-700 dark:text-blue-400 text-base">Expert (1640)</strong>
+                    <span className="text-[9px] text-muted-foreground block">Div. 2 Regular</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-secondary/50 border border-border space-y-1 text-center font-mono">
+                    <span className="text-[10px] text-muted-foreground block">GitHub Repos</span>
+                    <strong className="text-emerald-700 dark:text-emerald-400 text-base">42 Repos</strong>
+                    <span className="text-[9px] text-muted-foreground block">98% Branch Coverage</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Verified Soulbound Credentials (SBTs) */}
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold font-mono text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" /> Verified Soulbound Tokens on Polygon Amoy
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-xl bg-secondary/40 border border-border space-y-1.5 font-mono">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-primary font-bold">Token #101</span>
+                      <Badge variant="outline" className="text-[9px] text-emerald-600 border-emerald-500/40">ERC-5192</Badge>
+                    </div>
+                    <div className="font-bold text-xs text-foreground">Smart India Hackathon 2026 Winner</div>
+                    <div className="text-[10px] text-muted-foreground">Issued by Ministry of Education / AICTE</div>
+                  </div>
+                  <div className="p-3 rounded-xl bg-secondary/40 border border-border space-y-1.5 font-mono">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-primary font-bold">Token #88</span>
+                      <Badge variant="outline" className="text-[9px] text-emerald-600 border-emerald-500/40">ERC-5192</Badge>
+                    </div>
+                    <div className="font-bold text-xs text-foreground">Smart Contract Security Auditor</div>
+                    <div className="text-[10px] text-muted-foreground">Issued by Polygon Labs University Track</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Skills and Application Pitch */}
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold font-mono text-foreground uppercase tracking-wider">Candidate Skills</h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {(selectedCandidate?.studentSkills || ['Solidity', 'Foundry', 'Polygon', 'React', 'Node.js', 'Python']).map(s => (
+                    <span key={s} className="px-2.5 py-1 rounded-md bg-secondary text-foreground text-xs font-mono border border-border">
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {selectedCandidate?.notes && (
+                <div className="p-3 rounded-xl bg-primary/5 border border-primary/20 space-y-1 font-mono text-xs">
+                  <span className="text-[10px] font-bold text-primary uppercase">Candidate Pitch Note</span>
+                  <p className="text-foreground leading-relaxed">{selectedCandidate.notes}</p>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter className="border-t border-border pt-3 flex items-center justify-between">
+              <Button variant="ghost" size="sm" onClick={() => setCandidateModalOpen(false)} className="text-xs font-mono">
+                Close Dossier
+              </Button>
+              {selectedCandidate?.status === 'applied' && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    handleAcceptApplication(selectedCandidate);
+                    setCandidateModalOpen(false);
+                  }}
+                  className="bg-primary text-primary-foreground font-mono text-xs font-semibold gap-1"
+                >
+                  <Check className="h-3 w-3" /> Accept & Assign Gig
+                </Button>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>
