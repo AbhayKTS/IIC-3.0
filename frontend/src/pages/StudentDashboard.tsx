@@ -549,17 +549,46 @@ export default function StudentDashboard() {
 
               {/* 3. Live AI Skill Points Engine */}
               {(() => {
-                const lcSolved = overview?.codingProfiles?.leetcode?.totalSolved ?? 0;
-                const cfRating = overview?.codingProfiles?.codeforces?.rating ?? 0;
-                const cfSolved = overview?.codingProfiles?.codeforces?.totalSolved ?? 0;
-                const ghHandle = (overview?.codingProfiles as any)?.github?.username || (overview?.user as any)?.github || (overview?.profile as any)?.codingProfiles?.github || '';
-                const ghRepos = (overview?.codingProfiles as any)?.github?.publicRepos ?? 0;
+                const lcSolved = Number(overview?.codingProfiles?.leetcode?.totalSolved) || 0;
+                const cfRating = Number(overview?.codingProfiles?.codeforces?.rating) || 0;
+                const cfSolved = Number(overview?.codingProfiles?.codeforces?.totalSolved) || 0;
+
+                const getSafeHandle = (val: any): string => {
+                  if (!val) return '';
+                  if (typeof val === 'string') return val;
+                  if (typeof val?.username === 'string') return val.username;
+                  if (typeof val?.handle === 'string') return val.handle;
+                  return '';
+                };
+
+                const ghHandle =
+                  getSafeHandle(overview?.codingProfiles?.github) ||
+                  getSafeHandle(overview?.user?.github) ||
+                  getSafeHandle(overview?.profile?.codingProfiles?.github) ||
+                  getSafeHandle(overview?.profile?.github) ||
+                  '';
+
+                const lcHandle =
+                  getSafeHandle(overview?.codingProfiles?.leetcode) ||
+                  getSafeHandle(overview?.user?.leetcode) ||
+                  getSafeHandle(overview?.profile?.codingProfiles?.leetcode) ||
+                  getSafeHandle(overview?.profile?.leetcode) ||
+                  '';
+
+                const cfHandle =
+                  getSafeHandle(overview?.codingProfiles?.codeforces) ||
+                  getSafeHandle(overview?.user?.codeforces) ||
+                  getSafeHandle(overview?.profile?.codingProfiles?.codeforces) ||
+                  getSafeHandle(overview?.profile?.codeforces) ||
+                  '';
+
+                const ghRepos = Number((overview?.codingProfiles as any)?.github?.publicRepos) || 0;
 
                 const lcPoints = ((overview?.codingProfiles?.leetcode?.easy ?? 0) * 5) +
                                  ((overview?.codingProfiles?.leetcode?.medium ?? 0) * 15) +
                                  ((overview?.codingProfiles?.leetcode?.hard ?? 0) * 30);
                 const cfPoints = Math.max(0, cfRating) + (cfSolved * 10);
-                const ghPoints = ((overview?.codingProfiles as any)?.github?.points) ?? (ghHandle ? 50 : 0);
+                const ghPoints = Number((overview?.codingProfiles as any)?.github?.points) || (ghHandle ? 50 : 0);
 
                 const realCalculatedPoints = (overview?.user?.points?.coding || 0) > 0
                   ? (overview?.user?.points?.coding || 0)
@@ -608,7 +637,7 @@ export default function StudentDashboard() {
                         <div className="p-1.5 rounded bg-secondary/30">
                           <span className="text-[10px] text-muted-foreground block">LeetCode</span>
                           <strong className="text-foreground">
-                            {overview?.codingProfiles?.leetcode?.username
+                            {lcHandle
                               ? (lcSolved > 0 ? `${lcSolved} Solved` : '0 Solved')
                               : 'Not Linked'}
                           </strong>
@@ -616,7 +645,7 @@ export default function StudentDashboard() {
                         <div className="p-1.5 rounded bg-secondary/30">
                           <span className="text-[10px] text-muted-foreground block">Codeforces</span>
                           <strong className="text-foreground">
-                            {overview?.codingProfiles?.codeforces?.handle
+                            {cfHandle
                               ? (cfRating > 0 ? `${cfRating} Rtg` : (cfSolved > 0 ? `${cfSolved} Solved` : 'Unrated'))
                               : 'Not Linked'}
                           </strong>
@@ -813,15 +842,18 @@ export default function StudentDashboard() {
 
               {skillsList.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
-                  {skillsList.map((skill, index) => (
-                    <Badge
-                      key={index}
-                      variant="secondary"
-                      className="py-1.5 px-3 text-xs bg-secondary/80 hover:bg-secondary border border-border text-foreground"
-                    >
-                      {skill}
-                    </Badge>
-                  ))}
+                  {skillsList.map((skill, index) => {
+                    const skillName = typeof skill === 'string' ? skill : ((skill as any)?.name || `Skill ${index + 1}`);
+                    return (
+                      <Badge
+                        key={index}
+                        variant="secondary"
+                        className="py-1.5 px-3 text-xs bg-secondary/80 hover:bg-secondary border border-border text-foreground"
+                      >
+                        {skillName}
+                      </Badge>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="py-6 text-center text-sm text-muted-foreground">

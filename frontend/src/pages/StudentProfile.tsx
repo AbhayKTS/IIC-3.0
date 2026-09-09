@@ -656,23 +656,26 @@ export default function StudentProfile() {
           {/* Active Skills Chips */}
           <div className="flex flex-wrap gap-2 pt-2">
             {profile?.skills && profile.skills.length > 0 ? (
-              profile.skills.map((skill) => (
-                <div
-                  key={skill}
-                  className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#0A0B0D] border border-[#2A2D33] text-foreground text-xs font-mono group hover:border-[#3DDC84]/40 transition-colors"
-                >
-                  <span className="text-[#3DDC84]">#</span>
-                  <span>{skill}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveSkill(skill)}
-                    className="text-muted-foreground hover:text-destructive transition-colors ml-1"
-                    title={`Remove ${skill}`}
+              profile.skills.map((skill, idx) => {
+                const skillName = typeof skill === 'string' ? skill : ((skill as any)?.name || `Skill ${idx + 1}`);
+                return (
+                  <div
+                    key={skillName + idx}
+                    className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#0A0B0D] border border-[#2A2D33] text-foreground text-xs font-mono group hover:border-[#3DDC84]/40 transition-colors"
                   >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))
+                    <span className="text-[#3DDC84]">#</span>
+                    <span>{skillName}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveSkill(skillName)}
+                      className="text-muted-foreground hover:text-destructive transition-colors ml-1"
+                      title={`Remove ${skillName}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                );
+              })
             ) : (
               <p className="text-xs text-muted-foreground italic">
                 No skills listed yet. Click "Upload Resume" above to automatically extract your skills.
