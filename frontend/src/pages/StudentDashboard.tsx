@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/mockApi';
-import type { IdVerificationData, ResumeExtractionData, JobRecommendation, AppNotification } from '@/lib/types';
+import type { IdVerificationData, ResumeExtractionData, JobRecommendation, AppNotification, CodingProfiles } from '@/lib/types';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,7 +18,6 @@ import CameraIdScanner from '@/components/CameraIdScanner';
 import CodingProfilesSection from '@/components/CodingProfilesSection';
 import { useLiveStudentVerification } from '@/lib/useLiveStudentVerification';
 import { StudentVerificationBadge } from '@/components/StudentVerificationBadge';
-import type { IdVerificationData, ResumeExtractionData, JobRecommendation, AppNotification, CodingProfiles } from '@/lib/types';
 import {
   CheckCircle2,
   Clock,
