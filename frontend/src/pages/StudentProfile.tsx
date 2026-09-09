@@ -192,13 +192,34 @@ export default function StudentProfile() {
       const res = await api.uploadResume(resumeFile);
       if (res?.resumeData) {
         setResumeData(res.resumeData);
-        // Default: pre-select all extracted skills that aren't already in profile
+
+        // Immediately reflect the merged skills and extracted info on the profile page
+        if (res.mergedSkills && res.mergedSkills.length > 0) {
+          setProfile((prev) => (prev ? {
+            ...prev,
+            skills: res.mergedSkills,
+            resumeExtraction: res.resumeData,
+            resumeUploaded: true,
+            github: prev.github || res.extractedDetails?.github || res.resumeData.links?.github,
+            bio: prev.bio || res.extractedDetails?.bio || res.resumeData.summary,
+          } : null));
+
+          if (res.extractedDetails?.github && !githubHandle) {
+            setGithubHandle(res.extractedDetails.github);
+          }
+          if (res.extractedDetails?.bio && !studentBio) {
+            setStudentBio(res.extractedDetails.bio);
+          }
+        }
+
+        // Default: pre-select all extracted skills
         const initialSelected: Record<string, boolean> = {};
         (res.resumeData.skills || []).forEach((s) => {
-          initialSelected[s.name] = true;
+          const name = typeof s === 'string' ? s : s.name;
+          if (name) initialSelected[name] = true;
         });
         setSelectedSkills(initialSelected);
-        toast.success(`Resume parsed using ${res.resumeData.method}! Review extracted skills below.`);
+        toast.success(`Resume parsed using ${res.resumeData.method}! Skills and profile data saved successfully.`);
       }
     } catch (err: any) {
       toast.error(err.message || 'Failed to parse resume');
@@ -305,7 +326,7 @@ export default function StudentProfile() {
                   {profile?.email || (session?.user as any)?.email}
                 </p>
                 <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
-                  <span>College: <strong className="text-foreground font-mono">{profile?.collegeId?.toUpperCase() || 'IITD'}</strong></span>
+                  <span>College: <strong className="text-foreground font-mono">{(profile?.email || (session?.user as any)?.email || '').includes('gla.ac.in') || profile?.collegeId === 'c_gla' ? 'GLA University' : (profile?.collegeId?.toUpperCase() || 'GLA University')}</strong></span>
                 </div>
                 {profile?.bio && (
                   <p className="text-xs text-foreground/80 mt-1 max-w-md line-clamp-2 italic">

@@ -599,6 +599,14 @@ export const api = {
     resumeData: ResumeExtractionData;
     mergedSkills: string[];
     newSkillsAdded: string[];
+    profileCompletion?: number;
+    missingFields?: string[];
+    extractedDetails?: {
+      github?: string | null;
+      linkedin?: string | null;
+      bio?: string | null;
+      branch?: string | null;
+    };
     message?: string;
   }> {
     const formData = new FormData();
@@ -619,7 +627,56 @@ export const api = {
       const message = payload?.error?.message || payload?.message || res.statusText || 'Resume parsing failed';
       throw new Error(message);
     }
-    return payload?.data;
+    const data = payload?.data;
+
+    // Direct persistence in Firestore & local session to guarantee instantaneous updates
+    const sessionStr = localStorage.getItem('cv_session');
+    const session = sessionStr ? JSON.parse(sessionStr) : {};
+    const studentId = session?.userId || auth.currentUser?.uid;
+
+    if (studentId && data) {
+      const updates: any = {
+        skills: data.mergedSkills || [],
+        resumeExtraction: data.resumeData,
+        resumeUploaded: true,
+        resumeUploadedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (data.extractedDetails?.github) updates.github = data.extractedDetails.github;
+      if (data.extractedDetails?.linkedin) updates.linkedin = data.extractedDetails.linkedin;
+      if (data.extractedDetails?.bio) updates.bio = data.extractedDetails.bio;
+      if (data.extractedDetails?.branch) updates.branch = data.extractedDetails.branch;
+
+      // Update Firestore directly on named database
+      if (db) {
+        try {
+          await setDoc(doc(db, 'users', studentId), updates, { merge: true }).catch(() => null);
+          await setDoc(doc(db, 'students', studentId), updates, { merge: true }).catch(() => null);
+          await setDoc(doc(db, 'studentProfiles', studentId), updates, { merge: true }).catch(() => null);
+        } catch (e) {
+          console.warn('Direct Firestore resume persistence warning:', e);
+        }
+      }
+
+      // Update active session cache
+      if (session.user) {
+        session.user = {
+          ...session.user,
+          ...updates,
+        };
+        localStorage.setItem('cv_session', JSON.stringify(session));
+      }
+
+      broadcastRealtimeUpdate({
+        type: 'student:updated',
+        entityType: 'student',
+        entityId: studentId,
+        data: updates,
+      });
+    }
+
+    return data;
   },
 
   async updateStudentSkills(skills: string[]): Promise<Student> {

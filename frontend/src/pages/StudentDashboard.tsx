@@ -110,6 +110,31 @@ export default function StudentDashboard() {
         const isGla = domain.toLowerCase().includes('gla');
         const collegeName = isGla ? 'GLA University' : 'Registered Institution';
 
+        // Dynamic profile completion calculation for fallback overview
+        const hasResume = Boolean(sessUser.resumeExtraction || sessUser.resumeUploaded);
+        const hasSkills = Boolean(sessUser.skills && sessUser.skills.length > 0);
+        const hasId = Boolean(sessUser.idVerification?.status === 'verified' || sessUser.verificationStatus === 'verified');
+        const hasBio = Boolean(sessUser.bio);
+        const hasLinkedIn = Boolean(sessUser.linkedin);
+        const hasGitHub = Boolean(sessUser.github);
+        const hasBranch = Boolean(sessUser.branch || sessUser.department);
+
+        const checkList = [
+          { name: 'Full Name', ok: Boolean(sessUser.name || email) },
+          { name: 'College Email', ok: Boolean(email) },
+          { name: 'Institution', ok: true },
+          { name: 'Department / Branch', ok: hasBranch },
+          { name: 'Skills', ok: hasSkills },
+          { name: 'Resume Uploaded', ok: hasResume },
+          { name: 'College ID Verified', ok: hasId },
+          { name: 'Bio / Summary', ok: hasBio },
+          { name: 'LinkedIn Profile', ok: hasLinkedIn },
+          { name: 'GitHub / Projects', ok: hasGitHub },
+        ];
+        const completedCount = checkList.filter((c) => c.ok).length;
+        const dynamicCompletion = Math.round((completedCount / checkList.length) * 100);
+        const dynamicMissing = checkList.filter((c) => !c.ok).map((c) => c.name);
+
         const fallbackData: StudentOverviewData = {
           uid: session?.userId || 'student',
           role: session?.role || 'student',
@@ -123,14 +148,8 @@ export default function StudentDashboard() {
             domain,
           },
           profile: sessUser,
-          profileCompletion: sessUser.skills?.length ? 65 : 35,
-          missingFields: [
-            !sessUser.skills?.length ? 'Skills' : '',
-            'Resume Uploaded',
-            'College ID Verified',
-            'Bio / Summary',
-            'LinkedIn Profile',
-          ].filter(Boolean),
+          profileCompletion: dynamicCompletion,
+          missingFields: dynamicMissing,
           verificationStatus: sessUser.verificationStatus || 'unverified',
           idVerification: sessUser.idVerification || null,
           resumeExtraction: sessUser.resumeExtraction || null,
@@ -226,7 +245,23 @@ export default function StudentDashboard() {
       const res = await api.uploadResume(resumeFile);
       if (res?.resumeData) {
         setResumeResult(res.resumeData);
+        // Immediately update overview state so dashboard shows AI PARSED and the new skills without any delay
+        setOverview((prev) => {
+          if (!prev) return prev;
+          const mergedSkills = res.mergedSkills || (res.resumeData.skills || []).map((s: any) => typeof s === 'string' ? s : s.name);
+          const newMissing = (prev.missingFields || []).filter(
+            (f) => f !== 'Resume Uploaded' && f !== 'Skills' && (!res.extractedDetails?.bio || f !== 'Bio / Summary') && (!res.extractedDetails?.github || f !== 'GitHub / Projects') && (!res.extractedDetails?.linkedin || f !== 'LinkedIn Profile')
+          );
+          return {
+            ...prev,
+            resumeExtraction: res.resumeData,
+            skills: mergedSkills,
+            profileCompletion: res.profileCompletion ?? Math.min(100, Math.max(prev.profileCompletion + 30, 70)),
+            missingFields: res.missingFields || newMissing,
+          };
+        });
         toast.success(res.message || 'Resume parsed and skills extracted successfully!');
+        setIsResumeModalOpen(false);
         await fetchDashboardData();
       }
     } catch (err: any) {

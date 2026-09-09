@@ -52,17 +52,75 @@ const buildSearchableSkills = (skills) => {
 };
 
 const calculateProfileCompletion = (userDoc, profileDoc) => {
+  const resumeExt = userDoc?.resumeExtraction || profileDoc?.resumeExtraction;
   const checks = [
     { field: 'Full Name', valid: Boolean(userDoc?.name || profileDoc?.name) },
     { field: 'College Email', valid: Boolean(userDoc?.email) },
     { field: 'Institution', valid: Boolean(userDoc?.collegeId) },
-    { field: 'Department / Branch', valid: Boolean(profileDoc?.branch) },
-    { field: 'Skills', valid: Boolean((userDoc?.skills?.length || profileDoc?.skills?.length || 0) > 0) },
-    { field: 'Resume Uploaded', valid: Boolean(userDoc?.resumeExtraction || profileDoc?.resumeExtraction) },
-    { field: 'College ID Verified', valid: Boolean(userDoc?.idVerification?.status === 'verified' || userDoc?.verificationStatus === 'verified') },
-    { field: 'Bio / Summary', valid: Boolean(profileDoc?.bio) },
-    { field: 'LinkedIn Profile', valid: Boolean(profileDoc?.codingProfiles?.linkedin || profileDoc?.linkedin) },
-    { field: 'GitHub / Projects', valid: Boolean(profileDoc?.codingProfiles?.github || (profileDoc?.projects && profileDoc.projects.length > 0)) },
+    {
+      field: 'Department / Branch',
+      valid: Boolean(
+        profileDoc?.branch ||
+        userDoc?.branch ||
+        userDoc?.department ||
+        resumeExt?.education?.[0]?.field ||
+        resumeExt?.education?.[0]?.degree
+      ),
+    },
+    {
+      field: 'Skills',
+      valid: Boolean(
+        (userDoc?.skills && userDoc.skills.length > 0) ||
+        (profileDoc?.skills && profileDoc.skills.length > 0) ||
+        (resumeExt?.skills && resumeExt.skills.length > 0)
+      ),
+    },
+    {
+      field: 'Resume Uploaded',
+      valid: Boolean(
+        userDoc?.resumeExtraction ||
+        profileDoc?.resumeExtraction ||
+        userDoc?.resumeUploaded ||
+        profileDoc?.resumeUploaded
+      ),
+    },
+    {
+      field: 'College ID Verified',
+      valid: Boolean(
+        userDoc?.idVerification?.status === 'verified' ||
+        userDoc?.idVerification?.status === 'VERIFIED' ||
+        userDoc?.verificationStatus === 'verified'
+      ),
+    },
+    {
+      field: 'Bio / Summary',
+      valid: Boolean(
+        profileDoc?.bio ||
+        userDoc?.bio ||
+        resumeExt?.summary ||
+        resumeExt?.bio
+      ),
+    },
+    {
+      field: 'LinkedIn Profile',
+      valid: Boolean(
+        profileDoc?.codingProfiles?.linkedin ||
+        profileDoc?.linkedin ||
+        userDoc?.linkedin ||
+        resumeExt?.links?.linkedin
+      ),
+    },
+    {
+      field: 'GitHub / Projects',
+      valid: Boolean(
+        profileDoc?.codingProfiles?.github ||
+        profileDoc?.github ||
+        userDoc?.github ||
+        resumeExt?.links?.github ||
+        (profileDoc?.projects && profileDoc.projects.length > 0) ||
+        (userDoc?.projects && userDoc.projects.length > 0)
+      ),
+    },
   ];
 
   const completed = checks.filter((c) => c.valid).length;
@@ -527,29 +585,81 @@ const parseResume = async (req, res, next) => {
       method: parsedData.method,
     };
 
-    // Store resumeExtraction and merged skills on user doc
+    const extractedBranch = parsedData.education?.[0]?.field || parsedData.education?.[0]?.degree || null;
+    const extractedBio = parsedData.summary || parsedData.bio || null;
+    const extractedGithub = parsedData.links?.github || null;
+    const extractedLinkedin = parsedData.links?.linkedin || null;
+
+    const userUpdates = {
+      skills: mergedSkills,
+      resumeExtraction,
+      resumeUploaded: true,
+      resumeUploadedAt: now,
+      updatedAt: now,
+    };
+    if (extractedGithub && !actor.github) userUpdates.github = extractedGithub;
+    if (extractedLinkedin && !actor.linkedin) userUpdates.linkedin = extractedLinkedin;
+    if (extractedBio && !actor.bio) userUpdates.bio = extractedBio;
+    if (extractedBranch && !actor.branch) userUpdates.branch = extractedBranch;
+
+    const profileUpdates = {
+      skills: mergedSkills,
+      resumeExtraction,
+      resumeUploaded: true,
+      updatedAt: now,
+    };
+    if (Array.isArray(parsedData.education) && parsedData.education.length > 0) {
+      profileUpdates.education = parsedData.education;
+    }
+    if (Array.isArray(parsedData.experience) && parsedData.experience.length > 0) {
+      profileUpdates.experience = parsedData.experience;
+    }
+    if (Array.isArray(parsedData.certifications) && parsedData.certifications.length > 0) {
+      profileUpdates.certifications = parsedData.certifications;
+    }
+    if (extractedBranch) profileUpdates.branch = extractedBranch;
+    if (extractedBio) profileUpdates.bio = extractedBio;
+    if (extractedGithub || extractedLinkedin) {
+      profileUpdates.codingProfiles = {
+        ...(actor.codingProfiles || {}),
+        ...(extractedGithub ? { github: extractedGithub } : {}),
+        ...(extractedLinkedin ? { linkedin: extractedLinkedin } : {}),
+      };
+    }
+
+    // Store on users, students, and studentProfiles docs
     try {
-      await db.collection('users').doc(actor.uid).set({
-        skills: mergedSkills,
-        resumeExtraction,
+      await db.collection('users').doc(actor.uid).set(userUpdates, { merge: true });
+    } catch (err) {
+      logger.warn('[parseResume] users doc write warning:', err.message);
+    }
+
+    try {
+      await db.collection('students').doc(actor.uid).set(userUpdates, { merge: true });
+    } catch (err) {
+      logger.warn('[parseResume] students doc write warning:', err.message);
+    }
+
+    try {
+      await db.collection('studentProfiles').doc(actor.uid).set(profileUpdates, { merge: true });
+    } catch (err) {
+      logger.warn('[parseResume] studentProfiles doc write warning:', err.message);
+    }
+
+    try {
+      const searchableSkills = buildSearchableSkills(mergedSkills);
+      await db.collection('studentLeaderboard').doc(actor.uid).set({
+        searchableSkills,
         updatedAt: now,
       }, { merge: true });
-
-      if (profileSnapExists) {
-        await db.collection('studentProfiles').doc(actor.uid).set({
-          skills: mergedSkills,
-          updatedAt: now,
-        }, { merge: true });
-
-        const searchableSkills = buildSearchableSkills(mergedSkills);
-        await db.collection('studentLeaderboard').doc(actor.uid).set({
-          searchableSkills,
-          updatedAt: now,
-        }, { merge: true });
-      }
     } catch (err) {
-      logger.warn('[parseResume] Firestore write warning:', err.message);
+      logger.warn('[parseResume] studentLeaderboard write warning:', err.message);
     }
+
+    // Calculate updated completion
+    const updatedUserDoc = { ...actor, ...userUpdates };
+    const updatedProfileDoc = { ...profileUpdates };
+    const completion = calculateProfileCompletion(updatedUserDoc, updatedProfileDoc);
 
     // 4. Audit log
     try {
@@ -564,6 +674,7 @@ const parseResume = async (req, res, next) => {
           method: parsedData.method,
           skillsCount: (parsedData.skills || []).length,
           newSkillsAddedCount: newSkillsAdded.length,
+          profileCompletion: completion.percentage,
         },
       });
     } catch (err) {
@@ -586,7 +697,15 @@ const parseResume = async (req, res, next) => {
       resumeData: parsedData,
       mergedSkills,
       newSkillsAdded,
-      message: 'Resume parsed and skills merged successfully',
+      profileCompletion: completion.percentage,
+      missingFields: completion.missing,
+      extractedDetails: {
+        github: extractedGithub,
+        linkedin: extractedLinkedin,
+        bio: extractedBio,
+        branch: extractedBranch,
+      },
+      message: 'Resume parsed and profile updated successfully',
     });
   } catch (error) {
     return next(error);
