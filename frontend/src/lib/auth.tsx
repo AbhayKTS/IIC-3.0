@@ -190,14 +190,28 @@ export function useAuth() {
 }
 
 export function RequireAuth({ role, children }: { role: UserRole; children: React.ReactNode }) {
-  const { session } = useAuth();
+  const { session, loading } = useAuth();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!session) navigate('/login', { replace: true });
-    else if (session.role !== role) navigate('/', { replace: true });
-  }, [session, role, navigate]);
+  // Show spinner while Firebase auth state resolves — prevents redirect flash
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
-  if (!session || session.role !== role) return null;
+  if (!session) {
+    navigate('/login', { replace: true });
+    return null;
+  }
+
+  if (session.role !== role) {
+    navigate('/', { replace: true });
+    return null;
+  }
+
   return <>{children}</>;
 }
+

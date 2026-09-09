@@ -112,4 +112,14 @@ router.get('/profile', compat.getProfileByEmail);
 // Signup (create student/faculty/recruiter profile in Firestore)
 router.post('/signup', compat.signup);
 
+// Notifications
+router.get('/notifications', compat.listNotifications);
+router.post('/notifications', compat.createNotification);
+router.patch('/notifications/:notifId/read', compat.markNotificationRead);
+
+// Placements (create — called when recruiter finalises a hire)
+router.post('/placements', compat.createPlacement);
+
 module.exports = router;
+
+

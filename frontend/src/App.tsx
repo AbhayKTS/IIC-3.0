@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from 'sonner';
-import { AuthProvider, useAuth } from '@/lib/auth';
+import { AuthProvider, useAuth, RequireAuth } from '@/lib/auth';
 import type { UserRole } from '@/lib/types';
 
 // Public Pages
@@ -39,14 +39,18 @@ import RecruiterProfile from './pages/RecruiterProfile';
 import RecruiterMicroGigs from './pages/RecruiterMicroGigs';
 import RecruiterSearch from './pages/RecruiterSearch';
 import CollegeAnalytics from './pages/CollegeAnalytics';
+import RecruiterWallet from './pages/RecruiterWallet';
 
 const queryClient = new QueryClient();
 
-function RequireAuth({ role, children }: { role: UserRole; children: React.ReactNode }) {
+// RequireAuth is imported directly from auth.tsx — single source of truth
+
+// Guard for the SuperAdmin page: must be logged in as faculty or recruiter (not a student, not unauthenticated)
+function RequireAdmin({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
   if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" /></div>;
   if (!session) return <Navigate to="/login" replace />;
-  if (session.role !== role) return <Navigate to="/" replace />;
+  if (session.role === 'student') return <Navigate to="/student/dashboard" replace />;
   return <>{children}</>;
 }
 
@@ -67,7 +71,7 @@ const App = () => (
             <Route path="/signup/student" element={<SignupStudent />} />
             <Route path="/signup/college" element={<SignupCollege />} />
             <Route path="/signup/recruiter" element={<SignupRecruiter />} />
-            <Route path="/admin/institutions" element={<AdminInstitutions />} />
+            <Route path="/admin/institutions" element={<RequireAdmin><AdminInstitutions /></RequireAdmin>} />
 
             {/* Student Routes */}
             <Route path="/student/dashboard" element={<RequireAuth role="student"><StudentDashboard /></RequireAuth>} />
@@ -90,6 +94,7 @@ const App = () => (
             <Route path="/recruiter/profile" element={<RequireAuth role="recruiter"><RecruiterProfile /></RequireAuth>} />
             <Route path="/recruiter/microgigs" element={<RequireAuth role="recruiter"><RecruiterMicroGigs /></RequireAuth>} />
             <Route path="/recruiter/search" element={<RequireAuth role="recruiter"><RecruiterSearch /></RequireAuth>} />
+            <Route path="/recruiter/wallet" element={<RequireAuth role="recruiter"><RecruiterWallet /></RequireAuth>} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>

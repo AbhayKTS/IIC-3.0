@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useRealtimeStudents } from '@/lib/useRealtimeStudents';
+import { useAuth } from '@/lib/auth';
+import { api } from '@/lib/mockApi';
 import type { Student } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -61,10 +63,41 @@ export default function RealtimeStudentRoster({
     return name.includes(term) || email.includes(term) || bio.includes(term) || skills.includes(term);
   });
 
-  const handleShortlist = (st: Student) => {
+  const { session } = useAuth();
+  const recruiterId = session?.userId || 'recruiter';
+  const recruiterName = (session?.user as any)?.name || (session?.user as any)?.company || 'Recruiter';
+
+  const handleShortlist = async (st: Student) => {
+    // Optimistic UI update
     setShortlistedIds((prev) => ({ ...prev, [st.id]: true }));
-    onShortlistCandidate?.(st);
-    toast.success(`Shortlisted ${st.name}! Talent acquisition record updated in real time.`);
+
+    try {
+      // 1. Write shortlist record to Firestore via backend
+      await api.addToShortlist({
+        recruiterId,
+        studentId: st.id,
+        studentName: st.name || 'Student',
+        notes: `Shortlisted for skills: ${(st.skills || []).slice(0, 3).join(', ')}`,
+        addedAt: new Date().toISOString(),
+      } as any);
+
+      // 2. Create in-app notification for the student
+      await api.createNotification({
+        userId: st.id,
+        type: 'shortlist',
+        title: `You were shortlisted by ${recruiterName}!`,
+        body: `A recruiter at ${(session?.user as any)?.company || 'a company'} has shortlisted your profile. Check your profile for more details.`,
+        meta: { recruiterId, recruiterName },
+      }).catch(() => null); // don't fail the shortlist if notification fails
+
+      // 3. Propagate to parent (e.g. increment shortlistedCount counter)
+      onShortlistCandidate?.(st);
+      toast.success(`✅ ${st.name} shortlisted! They will receive an in-app notification.`);
+    } catch (err: any) {
+      // Revert optimistic update on failure
+      setShortlistedIds((prev) => ({ ...prev, [st.id]: false }));
+      toast.error(err?.message || 'Failed to shortlist candidate. Try again.');
+    }
   };
 
   return (

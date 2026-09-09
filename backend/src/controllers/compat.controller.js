@@ -1179,4 +1179,59 @@ module.exports = {
       return next(error);
     }
   },
+
+  // ─── Notifications ────────────────────────────────────────────────────────────
+  async listNotifications(req, res, next) {
+    try {
+      const { userId } = req.query || {};
+      if (!userId) return ok(res, []);
+      const snap = await db.collection('notifications').where('userId', '==', userId).orderBy('createdAt', 'desc').limit(50).get();
+      return ok(res, snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    } catch (error) {
+      return next(error);
+    }
+  },
+  async createNotification(req, res, next) {
+    try {
+      const { userId, type, title, body, meta } = req.body || {};
+      if (!userId || !title) return next(new Error('userId and title are required'));
+      const doc = await createDoc('notifications', {
+        userId,
+        type: type || 'info',
+        title,
+        body: body || '',
+        meta: meta || {},
+        read: false,
+        createdAt: new Date().toISOString(),
+      });
+      return ok(res, doc);
+    } catch (error) {
+      return next(error);
+    }
+  },
+  async markNotificationRead(req, res, next) {
+    try {
+      const { notifId } = req.params;
+      await db.collection('notifications').doc(notifId).set({ read: true }, { merge: true });
+      return ok(res, { id: notifId, read: true });
+    } catch (error) {
+      return next(error);
+    }
+  },
+
+  // ─── Placements (create) ──────────────────────────────────────────────────────
+  async createPlacement(req, res, next) {
+    try {
+      const payload = req.body || {};
+      const doc = await createDoc('placements', {
+        applicants: [],
+        createdAt: new Date().toISOString(),
+        ...payload,
+      });
+      return ok(res, doc);
+    } catch (error) {
+      return next(error);
+    }
+  },
 };
+

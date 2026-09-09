@@ -14,6 +14,7 @@ const aiRoutes = require('./v1/ai.routes');
 const sbtRoutes = require('./v1/sbt.routes');
 const superadminRoutes = require('./v1/superadmin.routes');
 const internalRoutes = require('./v1/internal.routes');
+const razorpayRoutes = require('./v1/razorpay.routes');
 const { ok } = require('../utils/response');
 
 const router = express.Router();
@@ -39,5 +40,6 @@ router.use('/sbt', sbtRoutes);
 router.use('/superadmin', superadminRoutes);
 router.use('/internal', internalRoutes);
 router.use('/n8n', internalRoutes);
+router.use('/razorpay', razorpayRoutes);
 
 module.exports = router;

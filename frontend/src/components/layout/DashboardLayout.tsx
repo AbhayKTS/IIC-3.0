@@ -32,6 +32,7 @@ const recruiterNav: NavItem[] = [
   { label: 'Company Profile', href: '/recruiter/profile', icon: <User className="h-4 w-4" /> },
   { label: 'Search Talent', href: '/recruiter/search', icon: <Layers className="h-4 w-4" /> },
   { label: 'MicroGigs', href: '/recruiter/microgigs', icon: <Zap className="h-4 w-4" /> },
+  { label: 'Wallet & Billing', href: '/recruiter/wallet', icon: <Wallet className="h-4 w-4" /> },
 ];
 
 export default function DashboardLayout({ role, children }: { role: UserRole; children: React.ReactNode }) {

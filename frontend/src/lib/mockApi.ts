@@ -922,6 +922,22 @@ export const api = {
     return request(`/compat/faculty/${id}`);
   },
 
+  // Notifications
+  async getNotifications(userId: string): Promise<any[]> {
+    return request(`/compat/notifications?userId=${encodeURIComponent(userId)}`);
+  },
+  async createNotification(data: { userId: string; type?: string; title: string; body?: string; meta?: Record<string, any> }): Promise<any> {
+    return request('/compat/notifications', { method: 'POST', body: data });
+  },
+  async markNotificationRead(notifId: string): Promise<any> {
+    return request(`/compat/notifications/${notifId}/read`, { method: 'PATCH' });
+  },
+
+  // Create Placement (recruiter finalises a hire)
+  async createPlacement(data: any): Promise<any> {
+    return request('/compat/placements', { method: 'POST', body: data });
+  },
+
   // Recruiters
   async getRecruiterById(id: string): Promise<Recruiter | undefined> {
     try {
