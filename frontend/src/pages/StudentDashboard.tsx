@@ -91,7 +91,9 @@ export default function StudentDashboard() {
       try {
         data = await api.getStudentOverview();
       } catch (apiErr: any) {
-        console.warn('API /student/me call failed or warming up:', apiErr);
+        if (apiErr?.message !== 'No active authentication session') {
+          console.debug('Dashboard overview fallback:', apiErr?.message);
+        }
       }
 
       if (data) {
@@ -276,25 +278,28 @@ export default function StudentDashboard() {
   const liveStudent = useLiveStudentVerification(session?.userId);
   const effectiveIdVerification = liveStudent.idVerification || idResult || overview?.idVerification;
 
-  const isIdVerified = liveStudent.isLoaded
-    ? liveStudent.status === 'verified'
-    : (effectiveIdVerification?.status === 'VERIFIED' ||
-       effectiveIdVerification?.status === 'verified' ||
-       overview?.verificationStatus === 'verified' ||
-       Boolean(idResult));
+  const isIdVerified =
+    liveStudent.status === 'verified' ||
+    effectiveIdVerification?.status === 'VERIFIED' ||
+    effectiveIdVerification?.status === 'verified' ||
+    overview?.verificationStatus === 'verified' ||
+    Boolean(idResult);
 
-  const isIdPending = liveStudent.isLoaded
-    ? liveStudent.status === 'pending'
-    : false;
+  const isIdPending =
+    !isIdVerified && (
+      liveStudent.status === 'pending' ||
+      effectiveIdVerification?.status === 'pending' ||
+      effectiveIdVerification?.status === 'pending_review'
+    );
 
   const verificationStatus: 'verified' | 'pending' | 'rejected' | 'unverified' =
-    liveStudent.isLoaded
-      ? liveStudent.status
-      : isIdVerified
-        ? 'verified'
-        : overview?.verificationStatus === 'rejected'
+    isIdVerified
+      ? 'verified'
+      : isIdPending
+        ? 'pending'
+        : (overview?.verificationStatus === 'rejected' || liveStudent.status === 'rejected')
           ? 'rejected'
-          : 'pending';
+          : 'unverified';
 
   const studentName = overview?.user?.name || overview?.profile?.name || session?.user?.name || 'Student';
   const studentEmail = overview?.user?.email || session?.user?.email || '';

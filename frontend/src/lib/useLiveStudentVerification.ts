@@ -14,8 +14,15 @@ export interface LiveVerificationState {
 }
 
 export function useLiveStudentVerification(uid: string | undefined): LiveVerificationState {
-  const [userDoc, setUserDoc] = useState<any | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [userDoc, setUserDoc] = useState<any | null>(() => {
+    try {
+      const s = typeof localStorage !== 'undefined' ? localStorage.getItem('cv_session') : null;
+      return s ? JSON.parse(s)?.user : null;
+    } catch (_) {
+      return null;
+    }
+  });
+  const [isLoaded, setIsLoaded] = useState(true);
 
   useEffect(() => {
     if (!uid) {
@@ -31,8 +38,8 @@ export function useLiveStudentVerification(uid: string | undefined): LiveVerific
         }
         setIsLoaded(true);
       },
-      (err) => {
-        console.warn('[useLiveStudentVerification] Live listener warning:', err);
+      (_err) => {
+        // Fallback to active session userDoc cleanly without noisy console warnings
         setIsLoaded(true);
       }
     );

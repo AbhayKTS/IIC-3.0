@@ -26,8 +26,17 @@ const request = async <T>(path: string, options: { method?: string; body?: any; 
   const { method = 'GET', body, auth: withAuth = false } = options;
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (withAuth) {
+    if (!auth.currentUser && typeof (auth as any).authStateReady === 'function') {
+      try {
+        await (auth as any).authStateReady();
+      } catch (_) {}
+    }
     const token = await auth.currentUser?.getIdToken();
-    if (token) headers.Authorization = `Bearer ${token}`;
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    } else {
+      throw new Error('No active authentication session');
+    }
   }
 
   const res = await fetch(`${API_BASE}${path}`, {
