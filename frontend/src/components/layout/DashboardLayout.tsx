@@ -22,6 +22,7 @@ const studentNav: NavItem[] = [
 const collegeNav: NavItem[] = [
   { label: 'Dashboard', href: '/college/dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
   { label: 'College Profile', href: '/college/profile', icon: <Building2 className="h-4 w-4" /> },
+  { label: 'Placements', href: '/college/placements', icon: <Briefcase className="h-4 w-4" /> },
   { label: 'Verification', href: '/college/verification', icon: <Shield className="h-4 w-4" /> },
   { label: 'Recruiters', href: '/college/recruiters', icon: <Briefcase className="h-4 w-4" /> },
   { label: 'Analytics', href: '/college/analytics', icon: <Trophy className="h-4 w-4" /> },

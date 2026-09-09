@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { useAuth } from '@/lib/auth';
+import { api } from '@/lib/mockApi';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,7 +17,7 @@ import {
 import {
   generateWalletFromSeed, formatAddress, explorerAddressUrl
 } from '@/lib/web3';
-import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 interface WalletTransaction {
@@ -30,6 +31,22 @@ interface WalletTransaction {
   txHash?: string;
 }
 
+// Dynamically load Razorpay Checkout SDK script
+const loadRazorpayScript = (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    if (typeof window !== 'undefined' && (window as any).Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
 export default function RecruiterWallet() {
   const { session } = useAuth();
   const userId = session?.userId || 'recruiter';
@@ -38,6 +55,7 @@ export default function RecruiterWallet() {
   const [balance, setBalance] = useState<number>(2500); // Default recruiter balance in USDC
   const [loading, setLoading] = useState(false);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
+  const prevBalanceRef = useRef<number | null>(null);
 
   // Top-up Modal State
   const [topUpOpen, setTopUpOpen] = useState(false);
@@ -50,7 +68,52 @@ export default function RecruiterWallet() {
     setWalletAddress(wallet.address);
   }, [userId]);
 
-  // Fetch live wallet balance and transactions from Firestore
+  // Real-time Firestore sync for wallet balance and transactions
+  useEffect(() => {
+    if (!userId || !db) return;
+
+    // 1. Listen for user wallet balance updates (triggered by verified backend webhook)
+    const userRef = doc(db, 'users', userId);
+    const unsubUser = onSnapshot(userRef, (snap) => {
+      if (snap.exists()) {
+        const uData = snap.data();
+        if (typeof uData.walletBalance === 'number') {
+          if (prevBalanceRef.current !== null && uData.walletBalance > prevBalanceRef.current) {
+            const added = uData.walletBalance - prevBalanceRef.current;
+            toast.success(`🎉 Verified Webhook: +${added.toLocaleString()} USDC credited to your wallet!`);
+          }
+          prevBalanceRef.current = uData.walletBalance;
+          setBalance(uData.walletBalance);
+        }
+      }
+    }, (err) => {
+      console.warn('Live balance listener error:', err.message);
+    });
+
+    // 2. Listen for transaction updates
+    const txRef = collection(db, 'transactions');
+    const q = query(
+      txRef,
+      where('userId', '==', userId),
+      orderBy('timestamp', 'desc'),
+      limit(20)
+    );
+    const unsubTx = onSnapshot(q, (snap) => {
+      if (!snap.empty) {
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as WalletTransaction));
+        setTransactions(list);
+      }
+    }, (err) => {
+      console.warn('Live transactions listener error:', err.message);
+    });
+
+    return () => {
+      unsubUser();
+      unsubTx();
+    };
+  }, [userId]);
+
+  // Manual fallback refresh
   const fetchWalletData = useCallback(async () => {
     if (!userId) return;
     setLoading(true);
@@ -62,10 +125,10 @@ export default function RecruiterWallet() {
           const uData = userSnap.data();
           if (typeof uData.walletBalance === 'number') {
             setBalance(uData.walletBalance);
+            prevBalanceRef.current = uData.walletBalance;
           }
         }
 
-        // Fetch transactions
         const txRef = collection(db, 'transactions');
         const q = query(
           txRef,
@@ -77,30 +140,6 @@ export default function RecruiterWallet() {
         if (!txSnap.empty) {
           const list = txSnap.docs.map(d => ({ id: d.id, ...d.data() } as WalletTransaction));
           setTransactions(list);
-        } else {
-          // Default initial transactions if none exists
-          setTransactions([
-            {
-              id: 'tx_init_1',
-              type: 'TOPUP',
-              label: 'Initial Account Deposit',
-              amount: '+2,500 USDC',
-              timestamp: Date.now() - 86400000 * 2,
-              status: 'confirmed',
-              network: 'Polygon Amoy',
-              txHash: '0x8f3b...e21a',
-            },
-            {
-              id: 'tx_init_2',
-              type: 'ESCROW_LOCK',
-              label: 'Smart Contract Escrow for Fullstack Gig',
-              amount: '-350 USDC',
-              timestamp: Date.now() - 86400000,
-              status: 'confirmed',
-              network: 'ERC-4337 Escrow',
-              txHash: '0x4c1a...99e8',
-            },
-          ]);
         }
       }
     } catch (err: any) {
@@ -114,7 +153,8 @@ export default function RecruiterWallet() {
     fetchWalletData();
   }, [fetchWalletData]);
 
-  // Handle Top-Up via Razorpay or simulated fast-path
+  // Handle Top-Up via Razorpay Test Mode
+  // CRITICAL RULE: Crediting ONLY happens on verified backend webhook, NEVER from frontend callback!
   const handleTopUp = async () => {
     const amountNum = parseFloat(topUpAmount);
     if (isNaN(amountNum) || amountNum <= 0) {
@@ -124,39 +164,62 @@ export default function RecruiterWallet() {
 
     setIsProcessingTopUp(true);
     try {
-      const tokenAmount = amountNum; // 1 INR = 1 Token in test/sandbox
-      const newBal = balance + tokenAmount;
-
-      if (db) {
-        const userRef = doc(db, 'users', userId);
-        await setDoc(userRef, { walletBalance: newBal }, { merge: true });
-
-        const txRecord = {
-          userId,
-          type: 'TOPUP' as const,
-          label: `Wallet Top-up via Razorpay (₹${amountNum.toLocaleString('en-IN')})`,
-          amount: `+${tokenAmount} USDC`,
-          timestamp: Date.now(),
-          status: 'confirmed' as const,
-          network: 'Fiat/INR (Razorpay)',
-          txHash: `rzp_pay_${Date.now().toString(36)}`,
-        };
-
-        const txColl = collection(db, 'transactions');
-        await setDoc(doc(txColl), txRecord);
-
-        setTransactions(prev => [
-          { id: txRecord.txHash, ...txRecord },
-          ...prev,
-        ]);
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        throw new Error('Razorpay SDK could not be loaded. Please check your internet connection.');
       }
 
-      setBalance(newBal);
-      toast.success(`Successfully added ${tokenAmount.toLocaleString()} USDC to your corporate escrow wallet!`);
-      setTopUpOpen(false);
+      // 1. Create order on backend
+      const orderRes = await api.createRazorpayOrder(amountNum);
+      if (!orderRes || !orderRes.id) {
+        throw new Error(orderRes?.error || 'Failed to create Razorpay order');
+      }
+
+      const keyId = orderRes.keyId || import.meta.env.VITE_RAZORPAY_KEY_ID;
+      if (!keyId) {
+        throw new Error('Razorpay Key ID is not configured on the server. Please set RAZORPAY_KEY_ID.');
+      }
+
+      // 2. Open Razorpay Checkout in Test Mode
+      const options = {
+        key: keyId,
+        amount: orderRes.amount,
+        currency: orderRes.currency || 'INR',
+        name: 'Almadox Corporate Treasury',
+        description: `Wallet Top-Up (₹${amountNum.toLocaleString('en-IN')})`,
+        order_id: orderRes.id,
+        prefill: {
+          name: session?.user?.name || 'Recruiter',
+          email: (session?.user as any)?.email || '',
+        },
+        theme: {
+          color: '#6366f1',
+        },
+        handler: function (_response: any) {
+          // STRICT SECURITY: Do NOT credit tokens in frontend callback.
+          // The verified backend webhook receives 'payment.captured' and credits Firestore.
+          setTopUpOpen(false);
+          setIsProcessingTopUp(false);
+          toast.info(
+            'Payment submitted! Waiting for server webhook verification to credit your balance...',
+            { duration: 6000 }
+          );
+        },
+        modal: {
+          ondismiss: function () {
+            setIsProcessingTopUp(false);
+          },
+        },
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on('payment.failed', function (resp: any) {
+        toast.error(`Payment failed: ${resp.error?.description || 'Transaction declined'}`);
+        setIsProcessingTopUp(false);
+      });
+      rzp.open();
     } catch (err: any) {
-      toast.error(err.message || 'Payment processing failed');
-    } finally {
+      toast.error(err.message || 'Payment initiation failed');
       setIsProcessingTopUp(false);
     }
   };

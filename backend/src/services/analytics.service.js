@@ -36,8 +36,62 @@ const getCollegeStats = async (collegeId) => {
   const cached = collegeCache.get(collegeId);
   if (cached) return cached;
 
-  const snap = await db.collection('collegeStats').doc(collegeId).get();
-  const stats = snap.exists ? snap.data() : {};
+  const snap = await db.collection('collegeStats').doc(collegeId).get().catch(() => null);
+  let stats = snap && snap.exists ? snap.data() : {};
+
+  // Aggregate live metrics from Firestore collections
+  try {
+    const studentsSnap = await db.collection('users')
+      .where('collegeId', '==', collegeId)
+      .where('role', '==', 'student')
+      .get()
+      .catch(() => ({ docs: [] }));
+
+    const students = studentsSnap.docs.map(d => d.data());
+    const totalStudents = students.length;
+    const totalVerifiedStudents = students.filter(
+      s => s.isVerified === true || s.idVerification?.status === 'verified'
+    ).length;
+    const totalPendingStudents = students.filter(
+      s => s.idVerification?.status === 'pending'
+    ).length;
+
+    const placementsSnap = await db.collection('placements')
+      .where('collegeId', '==', collegeId)
+      .get()
+      .catch(() => ({ docs: [] }));
+    const totalPlacements = placementsSnap.docs.length;
+
+    const recruitersSnap = await db.collection('users')
+      .where('role', '==', 'recruiter')
+      .get()
+      .catch(() => ({ docs: [] }));
+    const totalRecruiters = recruitersSnap.docs.length;
+
+    const gigsSnap = await db.collection('gigs')
+      .where('status', '==', 'open')
+      .get()
+      .catch(() => ({ docs: [] }));
+    const totalOpenGigs = gigsSnap.docs.length;
+
+    const placementRate = totalStudents > 0
+      ? Math.min(100, Math.round((totalPlacements / totalStudents) * 100))
+      : (stats.placementRate || 0);
+
+    stats = {
+      ...stats,
+      totalStudents: stats.totalStudents ?? totalStudents,
+      totalVerifiedStudents: stats.totalVerifiedStudents ?? totalVerifiedStudents,
+      totalPendingStudents: stats.totalPendingStudents ?? totalPendingStudents,
+      totalPlacements: stats.totalPlacements ?? totalPlacements,
+      totalRecruiters: stats.totalRecruiters ?? totalRecruiters,
+      totalOpenGigs: stats.totalOpenGigs ?? totalOpenGigs,
+      placementRate: stats.placementRate ?? placementRate,
+    };
+  } catch (_) {
+    // If collection aggregation encounters an issue, retain base stats
+  }
+
   const enriched = {
     ...stats,
     averageScore: computeAverageScore(stats),

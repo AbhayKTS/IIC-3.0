@@ -183,3 +183,32 @@ export function useRealtimeSync<T>({
     notifyChange,
   };
 }
+
+/**
+ * Convenience listener for real-time broadcast and DOM sync events
+ */
+export function onRealtimeUpdate(
+  channelOrCallback: string | ((event: any) => void),
+  optionalCallback?: (event: any) => void
+): () => void {
+  const cb = typeof channelOrCallback === 'function' ? channelOrCallback : optionalCallback;
+  const channelFilter = typeof channelOrCallback === 'string' ? channelOrCallback : null;
+
+  const handler = (e: any) => {
+    const detail = e.detail;
+    if (channelFilter && detail?.type && !detail.type.startsWith(channelFilter)) {
+      return;
+    }
+    if (cb) cb(detail || e);
+  };
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('cv:realtime_sync', handler);
+  }
+
+  return () => {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('cv:realtime_sync', handler);
+    }
+  };
+}

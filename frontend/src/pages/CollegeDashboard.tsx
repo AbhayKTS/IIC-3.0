@@ -32,40 +32,71 @@ export default function CollegeDashboard() {
 
   const [pendingCount, setPendingCount] = useState(0);
   const [verifiedCount, setVerifiedCount] = useState(0);
+  const [totalStudents, setTotalStudents] = useState(0);
+  const [placedCount, setPlacedCount] = useState(0);
+  const [placementRate, setPlacementRate] = useState(0);
   const [openGigsCount, setOpenGigsCount] = useState(0);
   const [recruiterCount, setRecruiterCount] = useState(0);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     loadStats();
-  }, []);
+  }, [collegeId]);
 
   const loadStats = async () => {
     setLoading(true);
     try {
-      const [pendingRes, verifiedRes, gigs] = await Promise.all([
+      const [pendingRes, verifiedRes, gigs, analyticsRes, placementsRes] = await Promise.all([
         api.getFacultyPendingStudents().catch(() => null),
         api.getVerifiedStudents().catch(() => []),
         api.getGigs().catch(() => []),
+        api.getCollegeAnalytics().catch(() => null),
+        api.getPlacements(collegeId || undefined).catch(() => []),
       ]);
 
+      const stats = analyticsRes?.stats || {};
+
+      let pPending = 0;
       if (pendingRes && Array.isArray(pendingRes.students)) {
-        setPendingCount(pendingRes.students.length);
+        pPending = pendingRes.students.length;
+      } else if (typeof stats.totalPendingStudents === 'number') {
+        pPending = stats.totalPendingStudents;
       }
+      setPendingCount(pPending);
 
       const verifiedList = Array.isArray(verifiedRes) ? verifiedRes : [];
       const myVerified = collegeId
         ? verifiedList.filter((s: any) => s.collegeId === collegeId)
         : verifiedList;
-      setVerifiedCount(myVerified.length);
+      const vCount = myVerified.length || stats.totalVerifiedStudents || 0;
+      setVerifiedCount(vCount);
+
+      const totStudents = stats.totalStudents || (vCount + pPending) || 0;
+      setTotalStudents(totStudents);
+
+      // Real placements count
+      const myPlacements = Array.isArray(placementsRes)
+        ? (collegeId ? placementsRes.filter((p: any) => p.collegeId === collegeId || p.status === 'placed') : placementsRes)
+        : [];
+      const pCount = myPlacements.length || stats.totalPlacements || 0;
+      setPlacedCount(pCount);
+
+      const computedRate = totStudents > 0
+        ? Math.min(100, Math.round((pCount / totStudents) * 100))
+        : (stats.placementRate || 0);
+      setPlacementRate(computedRate);
 
       const openGigs = Array.isArray(gigs) ? gigs.filter((g: any) => g.status === 'open' || !g.status) : [];
-      setOpenGigsCount(openGigs.length);
+      setOpenGigsCount(openGigs.length || stats.totalOpenGigs || 0);
 
-      // Recruiter count: try shortlist for a rough count
-      const shortlist = await api.getShortlist('').catch(() => []);
-      const uniqueRecruiters = new Set((Array.isArray(shortlist) ? shortlist : []).map((s: any) => s.recruiterId).filter(Boolean));
-      setRecruiterCount(uniqueRecruiters.size || 0);
+      const rCount = stats.totalRecruiters || 0;
+      if (rCount > 0) {
+        setRecruiterCount(rCount);
+      } else {
+        const shortlist = await api.getShortlist('').catch(() => []);
+        const uniqueRecruiters = new Set((Array.isArray(shortlist) ? shortlist : []).map((s: any) => s.recruiterId).filter(Boolean));
+        setRecruiterCount(uniqueRecruiters.size || 0);
+      }
     } catch {
       // Keep defaults
     } finally {
@@ -97,6 +128,9 @@ export default function CollegeDashboard() {
               <Button onClick={() => navigate('/college/profile')} className="gap-2 shadow-sm bg-primary text-primary-foreground">
                 <Building className="h-4 w-4" /> Manage College Profile
               </Button>
+              <Button variant="outline" onClick={() => navigate('/college/placements')} className="gap-2">
+                <Briefcase className="h-4 w-4 text-emerald-500" /> Placements ({placedCount})
+              </Button>
               <Button variant="outline" onClick={() => navigate('/college/verification')} className="gap-2">
                 <ShieldCheck className="h-4 w-4" /> Verification Queue ({pendingCount})
               </Button>
@@ -104,7 +138,7 @@ export default function CollegeDashboard() {
           </div>
         </div>
 
-        {/* 4 Core University Metric KPIs */}
+        {/* 4 Core University Metric KPIs with Real Live Aggregated Data */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="glass-card p-5 rounded-2xl border border-border/80 space-y-2">
             <div className="flex items-center justify-between text-muted-foreground text-xs">
@@ -113,18 +147,18 @@ export default function CollegeDashboard() {
             </div>
             <div className="text-2xl font-black text-foreground">{verifiedCount}</div>
             <div className="text-[11px] text-emerald-500 font-medium flex items-center gap-1">
-              <CheckCircle2 className="h-3 w-3" /> SBT-verified identities
+              <CheckCircle2 className="h-3 w-3" /> {totalStudents > 0 ? `${totalStudents} Total Registered` : 'SBT-verified identities'}
             </div>
           </div>
 
           <div className="glass-card p-5 rounded-2xl border border-border/80 space-y-2">
             <div className="flex items-center justify-between text-muted-foreground text-xs">
-              <span>Curriculum Alignment</span>
+              <span>Campus Placement Rate</span>
               <TrendingUp className="h-4 w-4 text-primary" />
             </div>
-            <div className="text-2xl font-black text-primary">84.2%</div>
+            <div className="text-2xl font-black text-primary">{placementRate}%</div>
             <div className="text-[11px] text-muted-foreground font-medium">
-              +14% since Micro-Gig integration
+              {placedCount} student{placedCount !== 1 ? 's' : ''} placed via platform
             </div>
           </div>
 
@@ -146,7 +180,7 @@ export default function CollegeDashboard() {
             </div>
             <div className="text-2xl font-black text-violet-400">{recruiterCount} Companies</div>
             <div className="text-[11px] text-emerald-500 font-medium">
-              Active shortlisting activity
+              Active corporate hiring
             </div>
           </div>
         </div>

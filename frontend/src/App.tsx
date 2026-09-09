@@ -32,6 +32,7 @@ import CollegeDashboard from './pages/CollegeDashboard';
 import CollegeProfile from './pages/CollegeProfile';
 import CollegeVerification from './pages/CollegeVerification';
 import CollegeRecruiters from './pages/CollegeRecruiters';
+import CollegePlacements from './pages/CollegePlacements';
 
 // Recruiter Pages
 import RecruiterDashboard from './pages/RecruiterDashboard';
@@ -85,6 +86,7 @@ const App = () => (
             {/* College Routes */}
             <Route path="/college/dashboard" element={<RequireAuth role="faculty"><CollegeDashboard /></RequireAuth>} />
             <Route path="/college/profile" element={<RequireAuth role="faculty"><CollegeProfile /></RequireAuth>} />
+            <Route path="/college/placements" element={<RequireAuth role="faculty"><CollegePlacements /></RequireAuth>} />
             <Route path="/college/verification" element={<RequireAuth role="faculty"><CollegeVerification /></RequireAuth>} />
             <Route path="/college/recruiters" element={<RequireAuth role="faculty"><CollegeRecruiters /></RequireAuth>} />
             <Route path="/college/analytics" element={<RequireAuth role="faculty"><CollegeAnalytics /></RequireAuth>} />

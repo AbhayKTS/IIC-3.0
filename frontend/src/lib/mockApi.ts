@@ -938,6 +938,14 @@ export const api = {
     return request('/compat/placements', { method: 'POST', body: data });
   },
 
+  // Razorpay
+  async createRazorpayOrder(amountInr: number): Promise<any> {
+    return request('/razorpay/orders', { method: 'POST', body: { amountInr }, auth: true });
+  },
+  async getWalletTransactions(): Promise<any> {
+    return request('/razorpay/wallet', { method: 'GET', auth: true });
+  },
+
   // Recruiters
   async getRecruiterById(id: string): Promise<Recruiter | undefined> {
     try {
@@ -994,8 +1002,11 @@ export const api = {
   },
 
   // Analytics
-  async getCollegeAnalytics(collegeId: string) {
-    return request(`/compat/analytics?collegeId=${encodeURIComponent(collegeId)}`);
+  async getCollegeAnalytics(collegeId?: string): Promise<{ stats?: any; [key: string]: any }> {
+    if (collegeId) {
+      return request(`/compat/analytics?collegeId=${encodeURIComponent(collegeId)}`);
+    }
+    return request('/faculty/analytics', { auth: true });
   },
 
   // Contact

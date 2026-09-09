@@ -132,6 +132,14 @@ const baseConfig = {
     adminPrivateKey: process.env.ADMIN_WALLET_PRIVATE_KEY || '',
     walletEncryptionKey: process.env.WALLET_ENCRYPTION_KEY || '',
   },
+  payments: {
+    razorpay: {
+      keyId: process.env.RAZORPAY_KEY_ID || '',
+      keySecret: process.env.RAZORPAY_KEY_SECRET || '',
+      webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET || '',
+      inrToTokenRate: Number(process.env.INR_TO_TOKEN_RATE) || 1,
+    },
+  },
 };
 
 module.exports = baseConfig;

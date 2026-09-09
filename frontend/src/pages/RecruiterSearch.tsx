@@ -5,11 +5,18 @@ import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import {
   Search, Users, Briefcase, Star, Code2, ShieldCheck,
-  ExternalLink, UserCheck, ArrowRight, Filter
+  ExternalLink, UserCheck, ArrowRight, Filter, CheckCircle2,
+  DollarSign, MapPin, Building, Sparkles
 } from 'lucide-react';
+import { collection, addDoc, doc, updateDoc, increment } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { broadcastRealtimeUpdate } from '@/lib/realtimeSync';
 
 interface StudentResult {
   userId: string;
@@ -24,6 +31,7 @@ interface StudentResult {
 export default function RecruiterSearch() {
   const { session } = useAuth();
   const recruiterId = session?.userId || 'recruiter';
+  const companyName = (session?.user as any)?.company || 'Corporate Partner';
 
   const [skills, setSkills] = useState('');
   const [minScore, setMinScore] = useState('');
@@ -32,6 +40,15 @@ export default function RecruiterSearch() {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [shortlisting, setShortlisting] = useState<string | null>(null);
+
+  // Finalize Hire Modal State
+  const [hireDialogOpen, setHireDialogOpen] = useState(false);
+  const [selectedCandidate, setSelectedCandidate] = useState<StudentResult | null>(null);
+  const [hireRole, setHireRole] = useState('Software Engineer');
+  const [hireCtc, setHireCtc] = useState('₹14,00,000 / annum');
+  const [hireLocation, setHireLocation] = useState('Bengaluru / Hybrid');
+  const [hireType, setHireType] = useState('Full-Time');
+  const [isFinalizingHire, setIsFinalizingHire] = useState(false);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,6 +111,80 @@ export default function RecruiterSearch() {
       toast.error(err.message || 'Failed to shortlist candidate');
     } finally {
       setShortlisting(null);
+    }
+  };
+
+  const openHireModal = (student: StudentResult) => {
+    setSelectedCandidate(student);
+    setHireRole('Software Engineer');
+    setHireCtc('₹14,00,000 / annum');
+    setHireLocation('Bengaluru / Hybrid');
+    setHireType('Full-Time');
+    setHireDialogOpen(true);
+  };
+
+  const handleConfirmHire = async () => {
+    if (!selectedCandidate) return;
+    if (!hireRole.trim() || !hireCtc.trim()) {
+      toast.error('Please enter the job role and package CTC');
+      return;
+    }
+
+    setIsFinalizingHire(true);
+    try {
+      const placementRecord = {
+        studentId: selectedCandidate.userId,
+        studentName: selectedCandidate.fullName || 'Verified Candidate',
+        collegeId: selectedCandidate.collegeId || '',
+        recruiterId,
+        company: companyName,
+        role: hireRole.trim(),
+        ctc: hireCtc.trim(),
+        location: hireLocation.trim(),
+        type: hireType,
+        status: 'placed',
+        placedAt: new Date().toISOString(),
+        timestamp: Date.now(),
+        skills: selectedCandidate.skills || [],
+      };
+
+      // 1. Create placement in Firestore
+      if (db) {
+        await addDoc(collection(db, 'placements'), placementRecord);
+
+        // Update recruiter's hiredCount
+        try {
+          const recruiterRef = doc(db, 'users', recruiterId);
+          await updateDoc(recruiterRef, {
+            hiredCount: increment(1),
+          });
+        } catch (_) {}
+      }
+
+      // 2. Call backend compat endpoint as well
+      await api.createPlacement(placementRecord).catch(() => null);
+
+      // 3. Notify the student
+      await api.createNotification({
+        userId: selectedCandidate.userId,
+        type: 'placement_offer',
+        title: `🎉 Offer Letter: Hired at ${companyName}!`,
+        body: `Congratulations! You have been placed as a ${hireRole} at ${companyName} with an offered CTC of ${hireCtc}.`,
+        meta: { company: companyName, role: hireRole, ctc: hireCtc },
+      }).catch(() => null);
+
+      // 4. Broadcast real-time update to student & faculty dashboards
+      broadcastRealtimeUpdate('placements', 'placement_created', placementRecord);
+
+      toast.success(
+        `🎉 Placement Finalized! ${selectedCandidate.fullName || 'Candidate'} and their college can now see the offer.`
+      );
+      setHireDialogOpen(false);
+      setSelectedCandidate(null);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to finalize placement');
+    } finally {
+      setIsFinalizingHire(false);
     }
   };
 
@@ -236,12 +327,21 @@ export default function RecruiterSearch() {
                     <div className="pt-3 border-t border-border/40 flex items-center gap-2">
                       <Button
                         size="sm"
+                        variant="outline"
                         onClick={() => handleShortlist(student)}
                         disabled={shortlisting === student.userId}
                         className="flex-1 text-xs gap-1.5"
                       >
                         <UserCheck className="h-3.5 w-3.5" />
                         {shortlisting === student.userId ? 'Adding...' : 'Shortlist'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => openHireModal(student)}
+                        className="flex-1 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold"
+                      >
+                        <Briefcase className="h-3.5 w-3.5" />
+                        Finalize Hire
                       </Button>
                     </div>
                   </div>
@@ -250,6 +350,94 @@ export default function RecruiterSearch() {
             )}
           </div>
         )}
+
+        {/* Finalize Hire Offer Dialog */}
+        <Dialog open={hireDialogOpen} onOpenChange={setHireDialogOpen}>
+          <DialogContent className="bg-[#14161A] border-[#2A2D33] text-[#F2F3F5] max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-base font-bold flex items-center gap-2 font-mono">
+                <Briefcase className="h-4 w-4 text-emerald-400" />
+                Finalize Placement Offer
+              </DialogTitle>
+              <DialogDescription className="text-xs text-[#8A8F98]">
+                Create an official campus placement record for{' '}
+                <span className="text-foreground font-semibold">
+                  {selectedCandidate?.fullName || 'this candidate'}
+                </span>
+                . The student and their university will be notified immediately.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3.5 mt-2 text-xs">
+              <div className="space-y-1">
+                <label className="text-muted-foreground font-mono">Company Name</label>
+                <Input
+                  value={companyName}
+                  disabled
+                  className="bg-[#0A0B0D] border-[#2A2D33] text-xs font-mono"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-muted-foreground font-mono">Job Role / Designation</label>
+                <Input
+                  value={hireRole}
+                  onChange={(e) => setHireRole(e.target.value)}
+                  placeholder="e.g. Software Engineer - Backend"
+                  className="bg-[#0A0B0D] border-[#2A2D33] text-xs font-mono"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="space-y-1">
+                  <label className="text-muted-foreground font-mono">Annual CTC / Package</label>
+                  <Input
+                    value={hireCtc}
+                    onChange={(e) => setHireCtc(e.target.value)}
+                    placeholder="e.g. 14 LPA"
+                    className="bg-[#0A0B0D] border-[#2A2D33] text-xs font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-muted-foreground font-mono">Job Location</label>
+                  <Input
+                    value={hireLocation}
+                    onChange={(e) => setHireLocation(e.target.value)}
+                    placeholder="e.g. Bengaluru / Hybrid"
+                    className="bg-[#0A0B0D] border-[#2A2D33] text-xs font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-start gap-2">
+                <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>
+                  Confirming this placement mints a verified offer record linked to the student's ID and institution ({selectedCandidate?.collegeId || 'University'}).
+                </span>
+              </div>
+            </div>
+
+            <DialogFooter className="mt-4 pt-3 border-t border-[#2A2D33]">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setHireDialogOpen(false)}
+                disabled={isFinalizingHire}
+                className="text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleConfirmHire}
+                disabled={isFinalizingHire || !hireRole.trim() || !hireCtc.trim()}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs gap-1.5"
+              >
+                {isFinalizingHire ? 'Processing Placement...' : 'Confirm & Finalize Hire'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );

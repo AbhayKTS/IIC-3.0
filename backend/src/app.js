@@ -40,7 +40,12 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-app.use(express.json({ limit: config.server.bodyLimit }));
+app.use(express.json({
+  limit: config.server.bodyLimit,
+  verify: (req, _res, buf) => {
+    req.rawBody = buf;
+  },
+}));
 app.use(express.urlencoded({ extended: true, limit: config.server.bodyLimit }));
 
 const fs = require('fs');
