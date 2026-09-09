@@ -492,8 +492,8 @@ export default function StudentDashboard() {
                     </Badge>
                   </div>
                   <div>
-                    <span className="text-2xl font-extrabold text-foreground block">$300.00 USDC</span>
-                    <span className="text-xs text-muted-foreground">≈ ₹25,800 INR (Off-ramp ready)</span>
+                    <span className="text-2xl font-extrabold text-foreground block">350.00 POL</span>
+                    <span className="text-xs text-muted-foreground">≈ ₹12,250 INR (Off-ramp ready)</span>
                   </div>
                   <div className="p-2.5 rounded-lg bg-secondary/40 text-xs space-y-1">
                     <div className="flex items-center justify-between">
@@ -520,16 +520,16 @@ export default function StudentDashboard() {
               <div className="glass-card p-6 rounded-xl border border-border/80 flex flex-col justify-between space-y-4 hover:border-amber-500/40 transition-all">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-amber-500 font-semibold text-sm">
+                    <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-semibold text-sm">
                       <Zap className="h-4 w-4" /> Paid Micro-Gigs
                     </div>
-                    <Badge className="bg-amber-500/10 text-amber-500 text-[10px]">
+                    <Badge className="bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 text-[10px]">
                       Proof-of-Work
                     </Badge>
                   </div>
                   <div>
                     <span className="text-2xl font-extrabold text-foreground block">4 Active Gigs</span>
-                    <span className="text-xs text-muted-foreground">Bounties from $120 to $250 USDC</span>
+                    <span className="text-xs text-muted-foreground">Bounties from 120 to 250 POL</span>
                   </div>
                   <div className="p-2.5 rounded-lg bg-secondary/40 text-xs space-y-1">
                     <div className="flex items-center justify-between">

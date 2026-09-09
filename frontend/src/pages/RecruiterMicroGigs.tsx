@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 import {
   Zap, Plus, CheckCircle2, ExternalLink, Star, Clock,
   ShieldCheck, Loader2, RefreshCw, Users, FileText,
-  ArrowUpRight, Award, Check, Code2, AlertCircle, Search
+  ArrowUpRight, Award, Check, Code2, AlertCircle, Search, Coins
 } from 'lucide-react';
 import { collection, addDoc, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -164,7 +164,6 @@ export default function RecruiterMicroGigs() {
         api.getGigApplications().catch(() => [] as GigApplication[]),
       ]);
 
-      // Merge backend gigs with seeded gigs (avoiding duplicate IDs)
       const mergedGigs = [...SEED_RECRUITER_GIGS];
       backendGigs.forEach((bg: any) => {
         if (!mergedGigs.some((g) => g.id === bg.id)) {
@@ -173,7 +172,6 @@ export default function RecruiterMicroGigs() {
       });
       setGigs(mergedGigs);
 
-      // Merge backend applications with seeded apps
       const mergedApps = [...SEED_APPLICATIONS];
       backendApps.forEach((ba: any) => {
         if (!mergedApps.some((a) => a.id === ba.id)) {
@@ -214,7 +212,6 @@ export default function RecruiterMicroGigs() {
         recruiterId,
       };
 
-      // 1. Post to backend
       let createdDoc: any = null;
       try {
         createdDoc = await api.createGig(newGig);
@@ -222,7 +219,6 @@ export default function RecruiterMicroGigs() {
         console.warn('Backend gig creation fallback to Firestore/Local:', err.message);
       }
 
-      // 2. Write to Firestore if available
       const gigId = createdDoc?.id || `gig_${Date.now().toString(36)}`;
       if (db) {
         await addDoc(collection(db, 'gigs'), {
@@ -239,7 +235,7 @@ export default function RecruiterMicroGigs() {
       };
 
       setGigs((prev) => [fullGig, ...prev]);
-      toast.success('🎉 Micro-Gig published! Students can now view and apply.');
+      toast.success('🎉 Micro-Gig published in POL! Students can now view and apply.');
       setCreateOpen(false);
       setTitle('');
       setDesc('');
@@ -253,14 +249,12 @@ export default function RecruiterMicroGigs() {
   // Accept candidate application
   const handleAcceptApplication = async (app: GigApplication) => {
     try {
-      // Update application state
       setApplications((prev) =>
         prev.map((a) => (a.id === app.id ? { ...a, status: 'accepted' } : a))
       );
 
       await api.updateGigApp(app.id, 'accepted').catch(() => null);
 
-      // Send notification to student
       await api.createNotification({
         userId: app.studentId,
         type: 'gig_accepted',
@@ -275,7 +269,7 @@ export default function RecruiterMicroGigs() {
     }
   };
 
-  // Handle Review & Release Payout
+  // Handle Review & Release Payout (in Polygon POL)
   const handleAcceptAndPayout = async () => {
     if (!selectedAppForPayout) return;
     setReleasing(true);
@@ -290,7 +284,7 @@ export default function RecruiterMicroGigs() {
       );
       await api.updateGigApp(selectedAppForPayout.id, 'completed').catch(() => null);
 
-      // 2. Simulate Polygon Amoy testnet payout
+      // 2. Simulate Polygon Amoy testnet payout in POL
       const studentWallet = generateWalletFromSeed(selectedAppForPayout.studentId);
       const payoutResult = await simulateGigPayout(studentWallet.address, payoutAmount);
 
@@ -298,8 +292,8 @@ export default function RecruiterMicroGigs() {
       saveTxRecord({
         hash: payoutResult.txHash,
         type: 'GIG_PAYOUT',
-        label: `MicroGig Payout: ${gig?.title || 'Escrow'} → ${selectedAppForPayout.studentName}`,
-        amount: `${payoutAmount} USDC`,
+        label: `MicroGig POL Payout: ${gig?.title || 'Escrow'} → ${selectedAppForPayout.studentName}`,
+        amount: `${payoutAmount} POL`,
         timestamp: Date.now(),
         status: 'confirmed',
         network: 'Polygon Amoy Testnet',
@@ -309,8 +303,8 @@ export default function RecruiterMicroGigs() {
       await api.createNotification({
         userId: selectedAppForPayout.studentId,
         type: 'gig_payout',
-        title: '💸 MicroGig Reward Released!',
-        body: `Congratulations! ${recruiterName} reviewed your deliverable with ${rating}★ and released $${payoutAmount} USDC.`,
+        title: '💸 MicroGig POL Reward Released!',
+        body: `Congratulations! ${recruiterName} reviewed your deliverable with ${rating}★ and released ${payoutAmount} POL directly to your Polygon wallet.`,
         meta: { txHash: payoutResult.txHash, rating, amount: payoutAmount },
       }).catch(() => null);
 
@@ -319,12 +313,12 @@ export default function RecruiterMicroGigs() {
 
       toast.success(
         <div>
-          <p className="font-semibold">Payout Released: ${payoutAmount} USDC → {selectedAppForPayout.studentName}</p>
+          <p className="font-semibold">Payout Released: {payoutAmount} POL → {selectedAppForPayout.studentName}</p>
           <a
             href={explorerTxUrl(payoutResult.txHash)}
             target="_blank"
             rel="noreferrer"
-            className="text-xs text-blue-400 underline flex items-center gap-1 mt-1 font-mono"
+            className="text-xs text-primary underline flex items-center gap-1 mt-1 font-mono"
           >
             <ExternalLink className="h-3 w-3" /> View On-Chain Settlement ({payoutResult.txHash.slice(0, 10)}...)
           </a>
@@ -338,12 +332,10 @@ export default function RecruiterMicroGigs() {
     }
   };
 
-  // Get applicants for a specific gig
   const getApplicantsForGig = (gigId: string) => {
     return applications.filter((a) => a.gigId === gigId);
   };
 
-  // Pending submissions across all gigs
   const pendingSubmissions = applications.filter(
     (a) => a.status === 'completed' || a.deliverableUrl
   );
@@ -356,14 +348,14 @@ export default function RecruiterMicroGigs() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2 font-mono">
-                <Zap className="h-6 w-6 text-primary" /> Micro-Gig Command Center
+                <Zap className="h-6 w-6 text-primary" /> Polygon Micro-Gig Command Center
               </h1>
-              <Badge variant="outline" className="font-mono text-xs border-primary/30 text-primary">
-                Corporate Portal
+              <Badge variant="outline" className="font-mono text-xs border-primary/40 text-primary">
+                Polygon Amoy Escrow
               </Badge>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Post verified codebase tasks, inspect applicant student portfolios, and execute smart escrow releases.
+            <p className="text-xs text-muted-foreground mt-1 font-mono">
+              Post verified codebase tasks in Polygon (POL), inspect applicant student portfolios, and execute smart escrow releases.
             </p>
           </div>
 
@@ -373,7 +365,7 @@ export default function RecruiterMicroGigs() {
               size="sm"
               onClick={loadGigsData}
               disabled={loading}
-              className="gap-1.5 text-xs font-mono"
+              className="gap-1.5 text-xs font-mono text-foreground border-border"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
             </Button>
@@ -381,43 +373,43 @@ export default function RecruiterMicroGigs() {
               onClick={() => setCreateOpen(true)}
               className="bg-primary text-primary-foreground gap-1.5 text-xs font-mono font-semibold shadow-sm"
             >
-              <Plus className="h-4 w-4" /> Post Micro-Gig
+              <Plus className="h-4 w-4" /> Post Micro-Gig (POL)
             </Button>
           </div>
         </div>
 
         {/* 4 Quick Stat Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="glass-card p-4 rounded-xl border border-border/80 space-y-1">
+          <div className="glass-card p-4 rounded-xl border border-border shadow-sm space-y-1 bg-card">
             <span className="text-xs text-muted-foreground font-mono flex items-center gap-1.5">
               <Zap className="h-3.5 w-3.5 text-primary" /> My Active Gigs
             </span>
             <div className="text-2xl font-black font-mono text-foreground">{gigs.length} Posted</div>
-            <div className="text-[11px] text-muted-foreground font-mono">Live on campus portal</div>
+            <div className="text-[11px] text-muted-foreground font-mono">Live on student portal</div>
           </div>
 
-          <div className="glass-card p-4 rounded-xl border border-border/80 space-y-1">
+          <div className="glass-card p-4 rounded-xl border border-border shadow-sm space-y-1 bg-card">
             <span className="text-xs text-muted-foreground font-mono flex items-center gap-1.5">
-              <Users className="h-3.5 w-3.5 text-blue-400" /> Student Applicants
+              <Users className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" /> Student Applicants
             </span>
-            <div className="text-2xl font-black font-mono text-blue-400">{applications.length} Candidates</div>
+            <div className="text-2xl font-black font-mono text-blue-600 dark:text-blue-400">{applications.length} Candidates</div>
             <div className="text-[11px] text-muted-foreground font-mono">Ready for candidate review</div>
           </div>
 
-          <div className="glass-card p-4 rounded-xl border border-border/80 space-y-1">
+          <div className="glass-card p-4 rounded-xl border border-border shadow-sm space-y-1 bg-card">
             <span className="text-xs text-muted-foreground font-mono flex items-center gap-1.5">
-              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> Deliverables for Payout
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Deliverables for Payout
             </span>
-            <div className="text-2xl font-black font-mono text-emerald-400">{pendingSubmissions.length} Ready</div>
-            <div className="text-[11px] text-emerald-500 font-mono">Code submitted for audit</div>
+            <div className="text-2xl font-black font-mono text-emerald-700 dark:text-emerald-400">{pendingSubmissions.length} Ready</div>
+            <div className="text-[11px] text-emerald-700 dark:text-emerald-500 font-mono">Code submitted for audit</div>
           </div>
 
-          <div className="glass-card p-4 rounded-xl border border-border/80 space-y-1">
+          <div className="glass-card p-4 rounded-xl border border-border shadow-sm space-y-1 bg-card">
             <span className="text-xs text-muted-foreground font-mono flex items-center gap-1.5">
-              <ShieldCheck className="h-3.5 w-3.5 text-amber-400" /> Escrow Committed
+              <Coins className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" /> Escrow Committed
             </span>
-            <div className="text-2xl font-black font-mono text-amber-400">
-              ${gigs.reduce((acc, g) => acc + (g.reward || 0), 0)} USDC
+            <div className="text-2xl font-black font-mono text-purple-700 dark:text-purple-400">
+              {gigs.reduce((acc, g) => acc + (g.reward || 0), 0)} POL
             </div>
             <div className="text-[11px] text-muted-foreground font-mono">Smart contract backed</div>
           </div>
@@ -441,7 +433,7 @@ export default function RecruiterMicroGigs() {
             onClick={() => setActiveTab('submissions')}
             className={`pb-3 font-semibold flex items-center gap-2 border-b-2 transition-all ${
               activeTab === 'submissions'
-                ? 'border-emerald-500 text-emerald-400'
+                ? 'border-emerald-500 text-emerald-700 dark:text-emerald-400'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -469,22 +461,22 @@ export default function RecruiterMicroGigs() {
                 return (
                   <div
                     key={gig.id}
-                    className="glass-card p-6 rounded-2xl border border-border/80 flex flex-col justify-between space-y-4 shadow-sm hover:border-primary/40 transition-all bg-[#121620]/60"
+                    className="glass-card p-6 rounded-2xl border border-border flex flex-col justify-between space-y-4 shadow-sm hover:border-primary/40 transition-all bg-card text-foreground"
                   >
                     <div className="space-y-3">
                       {/* Category & Status Header */}
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex flex-wrap items-center gap-1.5">
-                          <Badge variant="outline" className="text-[10px] font-mono border-primary/30 text-primary">
+                          <Badge variant="outline" className="text-[10px] font-mono border-primary/40 text-primary">
                             {gig.category}
                           </Badge>
-                          <Badge variant="outline" className="text-[10px] font-mono capitalize border-border/60">
+                          <Badge variant="outline" className="text-[10px] font-mono capitalize border-border text-foreground">
                             {gig.mode}
                           </Badge>
                         </div>
                         <div className="text-right">
-                          <span className="text-lg font-extrabold font-mono text-emerald-400">
-                            ${gig.reward} USDC
+                          <span className="text-lg font-extrabold font-mono text-purple-700 dark:text-purple-400">
+                            {gig.reward} POL
                           </span>
                           <span className="text-[10px] text-muted-foreground font-mono block">
                             Duration: {gig.duration}
@@ -497,7 +489,7 @@ export default function RecruiterMicroGigs() {
                         <h3 className="font-bold text-base text-foreground leading-snug font-mono">
                           {gig.title}
                         </h3>
-                        <p className="text-xs text-muted-foreground line-clamp-3 mt-1.5 leading-relaxed">
+                        <p className="text-xs text-muted-foreground line-clamp-3 mt-1.5 leading-relaxed font-mono">
                           {gig.description}
                         </p>
                       </div>
@@ -507,7 +499,7 @@ export default function RecruiterMicroGigs() {
                         {gig.skills.map((s) => (
                           <span
                             key={s}
-                            className="px-2 py-0.5 rounded-md bg-[#1C2333] text-[10px] font-mono text-muted-foreground"
+                            className="px-2 py-0.5 rounded-md bg-secondary text-[10px] font-mono text-foreground font-medium border border-border"
                           >
                             {s}
                           </span>
@@ -516,16 +508,16 @@ export default function RecruiterMicroGigs() {
                     </div>
 
                     {/* Applicant Bar & Actions */}
-                    <div className="pt-4 border-t border-border/40 flex items-center justify-between gap-2">
+                    <div className="pt-4 border-t border-border flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <Badge
                           variant="secondary"
                           className={`font-mono text-xs gap-1 py-1 ${
                             hasDeliverable
-                              ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                              ? 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30'
                               : gigApps.length > 0
-                              ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
-                              : 'bg-secondary/40 text-muted-foreground'
+                              ? 'bg-blue-500/15 text-blue-800 dark:text-blue-300 border border-blue-500/30'
+                              : 'bg-secondary text-muted-foreground border border-border'
                           }`}
                         >
                           <Users className="h-3.5 w-3.5" />
@@ -558,7 +550,7 @@ export default function RecruiterMicroGigs() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-bold text-foreground font-mono flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Deliverables Awaiting Code Review & Escrow Release
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> Deliverables Awaiting Code Review & Escrow Release
               </h2>
               <Badge variant="secondary" className="text-xs font-mono">
                 {pendingSubmissions.length} Submissions
@@ -566,8 +558,8 @@ export default function RecruiterMicroGigs() {
             </div>
 
             {pendingSubmissions.length === 0 ? (
-              <div className="glass-card p-12 text-center rounded-2xl border border-dashed border-border/80 space-y-2">
-                <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto opacity-70" />
+              <div className="glass-card p-12 text-center rounded-2xl border border-dashed border-border space-y-2 bg-card">
+                <CheckCircle2 className="h-10 w-10 text-emerald-600 dark:text-emerald-400 mx-auto opacity-70" />
                 <h3 className="font-semibold text-foreground font-mono">No pending deliverables</h3>
                 <p className="text-xs text-muted-foreground font-mono">
                   When students finish coding and submit their repository, it will appear here for payout.
@@ -581,7 +573,7 @@ export default function RecruiterMicroGigs() {
                   return (
                     <div
                       key={sub.id}
-                      className="glass-card p-6 rounded-2xl border border-border/80 flex flex-col justify-between space-y-4 shadow-sm bg-[#121620]/60"
+                      className="glass-card p-6 rounded-2xl border border-border flex flex-col justify-between space-y-4 shadow-sm bg-card text-foreground"
                     >
                       <div className="space-y-3">
                         <div className="flex items-start justify-between gap-2">
@@ -592,8 +584,8 @@ export default function RecruiterMicroGigs() {
                             <div className="text-[11px] text-muted-foreground font-mono">{sub.studentCollege}</div>
                           </div>
                           <div className="text-right">
-                            <span className="text-base font-extrabold text-emerald-400 font-mono">
-                              ${gig?.reward || 180} USDC
+                            <span className="text-base font-extrabold text-purple-700 dark:text-purple-400 font-mono">
+                              {gig?.reward || 180} POL
                             </span>
                             <span className="text-[10px] text-muted-foreground block font-mono">{sub.submittedAt}</span>
                           </div>
@@ -603,8 +595,8 @@ export default function RecruiterMicroGigs() {
                           {gig?.title || 'Micro-Gig Task'}
                         </h3>
 
-                        <div className="p-3 rounded-lg bg-[#0A0D14] border border-border/60 text-xs font-mono text-muted-foreground space-y-1">
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground/80 block">Student Note</span>
+                        <div className="p-3 rounded-lg bg-secondary/50 border border-border text-xs font-mono text-foreground space-y-1">
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold block">Student Note</span>
                           <p>{sub.notes}</p>
                         </div>
 
@@ -623,7 +615,7 @@ export default function RecruiterMicroGigs() {
                         )}
                       </div>
 
-                      <div className="pt-4 border-t border-border/40 flex items-center justify-end">
+                      <div className="pt-4 border-t border-border flex items-center justify-end">
                         <Button
                           size="sm"
                           onClick={() => {
@@ -634,7 +626,7 @@ export default function RecruiterMicroGigs() {
                           }}
                           className="bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs gap-1.5 shadow-sm"
                         >
-                          <Star className="h-3.5 w-3.5 fill-current" /> Rate & Release ${gig?.reward || 180} USDC
+                          <Star className="h-3.5 w-3.5 fill-current" /> Rate & Release {gig?.reward || 180} POL
                         </Button>
                       </div>
                     </div>
@@ -647,15 +639,15 @@ export default function RecruiterMicroGigs() {
 
         {/* ── MODAL 1: VIEW APPLICANTS FOR A SPECIFIC GIG ──────── */}
         <Dialog open={applicantsModalOpen} onOpenChange={setApplicantsModalOpen}>
-          <DialogContent className="bg-[#121620] border-[#2A2D33] text-[#F2F3F5] max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogContent className="bg-card border-border text-foreground max-w-2xl max-h-[85vh] overflow-y-auto shadow-2xl">
             <DialogHeader>
               <div className="flex items-center gap-2">
                 <DialogTitle className="text-base font-bold font-mono text-foreground flex items-center gap-2">
                   <Users className="h-4 w-4 text-primary" />
                   Candidate Applicants ({selectedGigForApplicants ? getApplicantsForGig(selectedGigForApplicants.id).length : 0})
                 </DialogTitle>
-                <Badge variant="outline" className="text-[10px] font-mono border-emerald-500/30 text-emerald-400">
-                  ${selectedGigForApplicants?.reward} USDC Escrow
+                <Badge variant="outline" className="text-[10px] font-mono border-purple-500/40 text-purple-700 dark:text-purple-400">
+                  {selectedGigForApplicants?.reward} POL Escrow
                 </Badge>
               </div>
               <DialogDescription className="text-xs text-muted-foreground font-mono">
@@ -668,28 +660,28 @@ export default function RecruiterMicroGigs() {
                 getApplicantsForGig(selectedGigForApplicants.id).map((app) => (
                   <div
                     key={app.id}
-                    className="p-4 rounded-xl bg-[#0A0D14] border border-border/70 space-y-3"
+                    className="p-4 rounded-xl bg-secondary/40 border border-border space-y-3"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="flex items-center gap-2">
                           <h4 className="font-bold text-sm font-mono text-foreground">{app.studentName}</h4>
-                          <span className="flex items-center gap-1 text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                          <span className="flex items-center gap-1 text-[10px] font-mono text-emerald-700 dark:text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/30">
                             <ShieldCheck className="h-3 w-3" /> SBT Verified
                           </span>
                         </div>
                         <div className="text-xs text-muted-foreground font-mono mt-0.5">
-                          {app.studentCollege} • LeetCode: <strong className="text-amber-400">{app.studentRating || '1850+'}</strong>
+                          {app.studentCollege} • LeetCode: <strong className="text-amber-700 dark:text-amber-400">{app.studentRating || '1850+'}</strong>
                         </div>
                       </div>
 
                       <div>
                         {app.status === 'completed' || app.deliverableUrl ? (
-                          <Badge className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-mono text-[10px]">
+                          <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 font-mono text-[10px]">
                             ⚡ Deliverable Submitted
                           </Badge>
                         ) : app.status === 'accepted' ? (
-                          <Badge className="bg-blue-500/15 text-blue-400 border border-blue-500/30 font-mono text-[10px]">
+                          <Badge className="bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30 font-mono text-[10px]">
                             In-Progress
                           </Badge>
                         ) : (
@@ -701,7 +693,7 @@ export default function RecruiterMicroGigs() {
                     </div>
 
                     {/* Pitch / Application Notes */}
-                    <div className="p-2.5 rounded-lg bg-[#141A26] text-xs font-mono text-muted-foreground leading-relaxed border border-border/40">
+                    <div className="p-3 rounded-lg bg-background text-xs font-mono text-foreground leading-relaxed border border-border">
                       <span className="text-[10px] uppercase tracking-wider text-primary font-bold block mb-1">
                         Application Proposal
                       </span>
@@ -715,7 +707,7 @@ export default function RecruiterMicroGigs() {
                           href={app.deliverableUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 text-xs text-primary font-mono font-medium hover:underline"
+                          className="inline-flex items-center gap-1.5 text-xs text-primary font-mono font-medium hover:underline p-2 rounded-lg bg-primary/10 border border-primary/20"
                         >
                           <Code2 className="h-3.5 w-3.5" /> Inspect Code Submission: {app.deliverableUrl}
                           <ExternalLink className="h-3 w-3" />
@@ -724,10 +716,10 @@ export default function RecruiterMicroGigs() {
                     )}
 
                     {/* Actions */}
-                    <div className="flex items-center justify-between pt-2 border-t border-border/40">
+                    <div className="flex items-center justify-between pt-2 border-t border-border">
                       <div className="flex items-center gap-1">
                         {(app.studentSkills || []).map((s) => (
-                          <span key={s} className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#1C2333] text-muted-foreground">
+                          <span key={s} className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-secondary text-foreground border border-border">
                             {s}
                           </span>
                         ))}
@@ -767,7 +759,7 @@ export default function RecruiterMicroGigs() {
               )}
             </div>
 
-            <DialogFooter className="mt-4 pt-3 border-t border-border/40">
+            <DialogFooter className="mt-4 pt-3 border-t border-border">
               <Button
                 variant="outline"
                 size="sm"
@@ -780,36 +772,36 @@ export default function RecruiterMicroGigs() {
           </DialogContent>
         </Dialog>
 
-        {/* ── MODAL 2: POST A NEW MICRO-GIG ─────────────────────── */}
+        {/* ── MODAL 2: POST A NEW MICRO-GIG (POL) ─────────────────── */}
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogContent className="bg-[#121620] border-[#2A2D33] text-[#F2F3F5] max-w-lg">
+          <DialogContent className="bg-card border-border text-foreground max-w-lg shadow-2xl">
             <DialogHeader>
-              <DialogTitle className="text-base font-bold flex items-center gap-2 font-mono">
-                <Zap className="h-4 w-4 text-primary" /> Post Engineering Micro-Gig
+              <DialogTitle className="text-base font-bold flex items-center gap-2 font-mono text-foreground">
+                <Zap className="h-4 w-4 text-primary" /> Post Engineering Micro-Gig (POL)
               </DialogTitle>
-              <DialogDescription className="text-xs text-[#8A8F98] font-mono">
-                Create a codebase task for verified campus students. Payout is backed by smart escrow.
+              <DialogDescription className="text-xs text-muted-foreground font-mono">
+                Create a codebase task for verified campus students. Payout is backed by smart escrow in Polygon (POL).
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-3.5 mt-2 text-xs font-mono">
               <div className="space-y-1">
-                <label className="text-foreground font-medium">Gig Title</label>
+                <label className="text-foreground font-semibold">Gig Title</label>
                 <Input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. Implement ERC-4337 Paymaster Module with Bundler Integration"
-                  className="bg-[#0A0D14] border-[#2A2D33] text-xs font-mono"
+                  className="bg-background border-input text-xs font-mono text-foreground"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-foreground font-medium">Category</label>
+                  <label className="text-foreground font-semibold">Category</label>
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full h-9 rounded-md bg-[#0A0D14] border border-[#2A2D33] px-3 text-xs font-mono text-foreground"
+                    className="w-full h-9 rounded-md bg-background border border-input px-3 text-xs font-mono text-foreground"
                   >
                     <option value="Web3 & Blockchain">Web3 & Blockchain</option>
                     <option value="Frontend Engineering">Frontend Engineering</option>
@@ -820,61 +812,61 @@ export default function RecruiterMicroGigs() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-foreground font-medium">Bounty (USDC)</label>
+                  <label className="text-foreground font-semibold">Bounty (POL)</label>
                   <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-xs text-muted-foreground font-mono">$</span>
                     <Input
                       type="number"
                       value={bounty}
                       onChange={(e) => setBounty(e.target.value)}
                       placeholder="180"
-                      className="bg-[#0A0D14] border-[#2A2D33] pl-6 text-xs font-mono"
+                      className="bg-background border-input text-xs font-mono text-foreground"
                     />
+                    <span className="absolute right-3 top-2.5 text-xs text-purple-600 dark:text-purple-400 font-mono font-bold">POL</span>
                   </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-foreground font-medium">Estimated Duration</label>
+                  <label className="text-foreground font-semibold">Estimated Duration</label>
                   <Input
                     value={duration}
                     onChange={(e) => setDuration(e.target.value)}
                     placeholder="e.g. 1 week"
-                    className="bg-[#0A0D14] border-[#2A2D33] text-xs font-mono"
+                    className="bg-background border-input text-xs font-mono text-foreground"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-foreground font-medium">Required Skills (comma-separated)</label>
+                  <label className="text-foreground font-semibold">Required Skills (comma-separated)</label>
                   <Input
                     value={skills}
                     onChange={(e) => setSkills(e.target.value)}
                     placeholder="Solidity, Foundry, Polygon"
-                    className="bg-[#0A0D14] border-[#2A2D33] text-xs font-mono"
+                    className="bg-background border-input text-xs font-mono text-foreground"
                   />
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-foreground font-medium">Task Description & Deliverables</label>
+                <label className="text-foreground font-semibold">Task Description & Deliverables</label>
                 <textarea
                   value={desc}
                   onChange={(e) => setDesc(e.target.value)}
                   placeholder="Detail the deliverable requirements, repository setup, and acceptance criteria..."
                   rows={4}
-                  className="w-full rounded-md bg-[#0A0D14] border border-[#2A2D33] p-2.5 text-xs font-mono text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full rounded-md bg-background border border-input p-2.5 text-xs font-mono text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
             </div>
 
-            <DialogFooter className="mt-4 pt-3 border-t border-[#2A2D33]">
+            <DialogFooter className="mt-4 pt-3 border-t border-border">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setCreateOpen(false)}
                 disabled={submitting}
-                className="font-mono text-xs"
+                className="font-mono text-xs text-foreground"
               >
                 Cancel
               </Button>
@@ -884,46 +876,46 @@ export default function RecruiterMicroGigs() {
                 disabled={submitting || !title.trim() || !desc.trim()}
                 className="bg-primary text-primary-foreground font-mono text-xs font-semibold gap-1.5"
               >
-                {submitting ? 'Publishing...' : 'Publish Micro-Gig'}
+                {submitting ? 'Publishing...' : 'Publish Micro-Gig (POL)'}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
-        {/* ── MODAL 3: RATE & RELEASE PAYOUT ────────────────────── */}
+        {/* ── MODAL 3: RATE & RELEASE PAYOUT (POL) ───────────────── */}
         <Dialog open={reviewModalOpen} onOpenChange={setReviewModalOpen}>
-          <DialogContent className="bg-[#121620] border-[#2A2D33] text-[#F2F3F5] max-w-md">
+          <DialogContent className="bg-card border-border text-foreground max-w-md shadow-2xl">
             <DialogHeader>
-              <DialogTitle className="text-base font-bold flex items-center gap-2 font-mono">
-                <Star className="h-4 w-4 text-amber-400 fill-current" />
-                Rate Work & Release Escrow
+              <DialogTitle className="text-base font-bold flex items-center gap-2 font-mono text-foreground">
+                <Star className="h-4 w-4 text-amber-500 fill-current" />
+                Rate Work & Release Polygon Escrow
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground font-mono">
-                Review deliverable for <strong className="text-foreground">{selectedAppForPayout?.studentName}</strong>. On-chain USDC transfer will execute on Polygon.
+                Review deliverable for <strong className="text-foreground">{selectedAppForPayout?.studentName}</strong>. On-chain POL transfer will execute on Polygon Amoy.
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 mt-2 text-xs font-mono">
-              <div className="p-3 rounded-lg bg-[#0A0D14] border border-border/70 space-y-1.5">
+              <div className="p-3.5 rounded-xl bg-secondary/50 border border-border space-y-1.5">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Recipient:</span>
                   <span className="text-foreground font-bold">{selectedAppForPayout?.studentName}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Settlement Amount:</span>
-                  <span className="text-emerald-400 font-extrabold">
-                    ${gigs.find((g) => g.id === selectedAppForPayout?.gigId)?.reward || 180} USDC
+                  <span className="text-purple-700 dark:text-purple-400 font-black text-sm">
+                    {gigs.find((g) => g.id === selectedAppForPayout?.gigId)?.reward || 180} POL
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Target Network:</span>
-                  <span className="text-primary">Polygon Amoy Testnet</span>
+                  <span className="text-primary font-medium">Polygon Amoy Testnet</span>
                 </div>
               </div>
 
               {/* Star Rating Selector */}
               <div className="space-y-1.5 text-center">
-                <label className="text-foreground font-medium block">Rating for Soulbound Token (SBT)</label>
+                <label className="text-foreground font-semibold block">Rating for Soulbound Token (SBT)</label>
                 <div className="flex items-center justify-center gap-2">
                   {[1, 2, 3, 4, 5].map((s) => (
                     <button
@@ -934,7 +926,7 @@ export default function RecruiterMicroGigs() {
                     >
                       <Star
                         className={`h-6 w-6 ${
-                          s <= rating ? 'text-amber-400 fill-current' : 'text-muted-foreground/40'
+                          s <= rating ? 'text-amber-500 fill-current' : 'text-muted-foreground/30'
                         }`}
                       />
                     </button>
@@ -943,24 +935,24 @@ export default function RecruiterMicroGigs() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-foreground font-medium">Recruiter Review & Endorsement</label>
+                <label className="text-foreground font-semibold">Recruiter Review & Endorsement</label>
                 <textarea
                   value={reviewNotes}
                   onChange={(e) => setReviewNotes(e.target.value)}
                   placeholder="Optional review note to be stamped on the candidate's verified profile..."
                   rows={2}
-                  className="w-full rounded-md bg-[#0A0D14] border border-[#2A2D33] p-2 text-xs font-mono text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full rounded-md bg-background border border-input p-2 text-xs font-mono text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
             </div>
 
-            <DialogFooter className="mt-4 pt-3 border-t border-[#2A2D33]">
+            <DialogFooter className="mt-4 pt-3 border-t border-border">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setReviewModalOpen(false)}
                 disabled={releasing}
-                className="font-mono text-xs"
+                className="font-mono text-xs text-foreground"
               >
                 Cancel
               </Button>
@@ -968,14 +960,14 @@ export default function RecruiterMicroGigs() {
                 size="sm"
                 onClick={handleAcceptAndPayout}
                 disabled={releasing}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-semibold gap-1.5 shadow-md shadow-emerald-500/20"
+                className="bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-semibold gap-1.5 shadow-sm"
               >
                 {releasing ? (
                   <>
                     <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Releasing Escrow...
                   </>
                 ) : (
-                  `Confirm & Release $${gigs.find((g) => g.id === selectedAppForPayout?.gigId)?.reward || 180} USDC`
+                  `Confirm & Release ${gigs.find((g) => g.id === selectedAppForPayout?.gigId)?.reward || 180} POL`
                 )}
               </Button>
             </DialogFooter>

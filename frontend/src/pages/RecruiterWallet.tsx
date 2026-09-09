@@ -32,28 +32,12 @@ interface WalletTransaction {
   txHash?: string;
 }
 
-// Dynamically load Razorpay Checkout SDK script
-const loadRazorpayScript = (): Promise<boolean> => {
-  return new Promise((resolve) => {
-    if (typeof window !== 'undefined' && (window as any).Razorpay) {
-      resolve(true);
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.async = true;
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-};
-
 export default function RecruiterWallet() {
   const { session } = useAuth();
   const userId = session?.userId || 'recruiter';
 
   const [walletAddress, setWalletAddress] = useState('');
-  const [balance, setBalance] = useState<number>(2500); // Default recruiter balance in USDC
+  const [balance, setBalance] = useState<number>(2500); // Recruiter balance in Polygon POL
   const [loading, setLoading] = useState(false);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const prevBalanceRef = useRef<number | null>(null);
@@ -69,6 +53,13 @@ export default function RecruiterWallet() {
     amount: number;
   }>({ amount: 5000 });
 
+  // Withdraw Modal State
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState('1000');
+  const [withdrawMethod, setWithdrawMethod] = useState<'upi' | 'bank'>('upi');
+  const [withdrawDestination, setWithdrawDestination] = useState('recruiter@okhdfcbank');
+  const [isProcessingWithdraw, setIsProcessingWithdraw] = useState(false);
+
   // Generate deterministic custodial Polygon address
   useEffect(() => {
     const wallet = generateWalletFromSeed(`recruiter_${userId}`);
@@ -79,7 +70,7 @@ export default function RecruiterWallet() {
   useEffect(() => {
     if (!userId || !db) return;
 
-    // 1. Listen for user wallet balance updates (triggered by verified backend webhook)
+    // 1. Listen for user wallet balance updates
     const userRef = doc(db, 'users', userId);
     const unsubUser = onSnapshot(userRef, (snap) => {
       if (snap.exists()) {
@@ -87,7 +78,7 @@ export default function RecruiterWallet() {
         if (typeof uData.walletBalance === 'number') {
           if (prevBalanceRef.current !== null && uData.walletBalance > prevBalanceRef.current) {
             const added = uData.walletBalance - prevBalanceRef.current;
-            toast.success(`🎉 Verified Webhook: +${added.toLocaleString()} USDC credited to your wallet!`);
+            toast.success(`🎉 Verified: +${added.toLocaleString()} POL credited to your Polygon treasury!`);
           }
           prevBalanceRef.current = uData.walletBalance;
           setBalance(uData.walletBalance);
@@ -160,13 +151,6 @@ export default function RecruiterWallet() {
     fetchWalletData();
   }, [fetchWalletData]);
 
-  // Withdraw Modal State
-  const [withdrawOpen, setWithdrawOpen] = useState(false);
-  const [withdrawAmount, setWithdrawAmount] = useState('1000');
-  const [withdrawMethod, setWithdrawMethod] = useState<'upi' | 'bank'>('upi');
-  const [withdrawDestination, setWithdrawDestination] = useState('recruiter@okhdfcbank');
-  const [isProcessingWithdraw, setIsProcessingWithdraw] = useState(false);
-
   // Open Razorpay Checkout Modal with animation
   const handleTopUp = async () => {
     const amountNum = parseFloat(topUpAmount);
@@ -193,15 +177,16 @@ export default function RecruiterWallet() {
     setRazorpayModalOpen(true);
   };
 
-  // Handle Razorpay Payment Success & Treasury Credit
+  // Handle Razorpay Payment Success & Polygon POL Treasury Credit
   const handleRazorpaySuccess = async (paymentData: {
     razorpay_payment_id: string;
     razorpay_order_id?: string;
     razorpay_signature?: string;
     amount: number;
   }) => {
-    const tokenAmount = paymentData.amount;
-    const newBal = balance + tokenAmount;
+    // 1 INR = 1 POL on Sandbox Testnet
+    const polAmount = paymentData.amount;
+    const newBal = balance + polAmount;
 
     if (db) {
       const userRef = doc(db, 'users', userId);
@@ -210,11 +195,11 @@ export default function RecruiterWallet() {
       const txRecord = {
         userId,
         type: 'TOPUP' as const,
-        label: `Wallet Top-up via Razorpay (${paymentData.razorpay_payment_id})`,
-        amount: `+${tokenAmount} USDC`,
+        label: `Wallet Top-up via Razorpay (Converted to POL) — ${paymentData.razorpay_payment_id}`,
+        amount: `+${polAmount} POL`,
         timestamp: Date.now(),
         status: 'confirmed' as const,
-        network: 'Fiat/INR (Razorpay)',
+        network: 'Polygon Amoy Testnet (Fiat/INR)',
         txHash: paymentData.razorpay_payment_id,
       };
 
@@ -223,18 +208,18 @@ export default function RecruiterWallet() {
     }
 
     setBalance(newBal);
-    toast.success(`🎉 Verified: +${tokenAmount.toLocaleString()} USDC credited to corporate treasury!`);
+    toast.success(`🎉 Verified: +${polAmount.toLocaleString()} POL credited to Polygon corporate treasury!`);
   };
 
-  // Handle Treasury Withdrawal
+  // Handle Treasury Withdrawal (POL -> INR)
   const handleWithdraw = async () => {
     const amountNum = parseFloat(withdrawAmount);
     if (isNaN(amountNum) || amountNum <= 0) {
-      toast.error('Please enter a valid withdrawal amount');
+      toast.error('Please enter a valid withdrawal amount in POL');
       return;
     }
     if (amountNum > balance) {
-      toast.error(`Insufficient balance. Maximum available: $${balance.toLocaleString()} USDC`);
+      toast.error(`Insufficient balance. Maximum available: ${balance.toLocaleString()} POL`);
       return;
     }
     if (!withdrawDestination.trim()) {
@@ -245,16 +230,17 @@ export default function RecruiterWallet() {
     setIsProcessingWithdraw(true);
     try {
       const newBal = balance - amountNum;
-      const inrValue = Math.round(amountNum * 86);
+      // 1 POL ≈ ₹35 INR
+      const inrValue = Math.round(amountNum * 35);
 
       const txRecord = {
         userId,
         type: 'PAYOUT' as const,
-        label: `Treasury Withdrawal to ${withdrawMethod.toUpperCase()} (${withdrawDestination})`,
-        amount: `-${amountNum} USDC`,
+        label: `POL Treasury Withdrawal to ${withdrawMethod.toUpperCase()} (${withdrawDestination})`,
+        amount: `-${amountNum} POL`,
         timestamp: Date.now(),
         status: 'confirmed' as const,
-        network: 'Fiat/INR (IMPS Payout)',
+        network: 'Polygon Amoy → Fiat/IMPS',
         txHash: `payout_${Date.now().toString(36)}`,
       };
 
@@ -266,18 +252,18 @@ export default function RecruiterWallet() {
         await addDoc(txColl, txRecord);
       }
 
-      // Send notification & message to recruiter
+      // Send notification to recruiter
       await api.createNotification({
         userId,
         type: 'withdrawal',
-        title: '💸 Treasury Withdrawal Processed',
-        body: `Withdrawal of ₹${inrValue.toLocaleString('en-IN')} (${amountNum} USDC) has been remitted to ${withdrawDestination} via IMPS.`,
+        title: '💸 Polygon Treasury Payout Processed',
+        body: `Withdrawal of ${amountNum} POL (≈ ₹${inrValue.toLocaleString('en-IN')}) has been remitted to ${withdrawDestination} via IMPS.`,
         meta: { amount: amountNum, destination: withdrawDestination },
       }).catch(() => null);
 
       setBalance(newBal);
       setTransactions((prev) => [{ id: txRecord.txHash, ...txRecord }, ...prev]);
-      toast.success(`💸 Withdrawal of ₹${inrValue.toLocaleString('en-IN')} successfully sent to ${withdrawDestination}!`);
+      toast.success(`💸 Dispatched ₹${inrValue.toLocaleString('en-IN')} (${amountNum} POL) to ${withdrawDestination}!`);
       setWithdrawOpen(false);
     } catch (err: any) {
       toast.error(err.message || 'Withdrawal failed');
@@ -300,14 +286,14 @@ export default function RecruiterWallet() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold font-mono tracking-tight text-foreground flex items-center gap-2">
-                <Wallet className="h-6 w-6 text-primary" /> Corporate Escrow & Treasury
+                <Wallet className="h-6 w-6 text-primary" /> Corporate Polygon Escrow & Treasury
               </h1>
-              <Badge variant="outline" className="font-mono text-xs border-primary/30 text-primary">
-                ERC-4337 Smart Account
+              <Badge variant="outline" className="font-mono text-xs border-primary/40 text-primary">
+                Polygon Amoy • ERC-4337
               </Badge>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Deposit hiring funds, fund verified student MicroGigs, and execute automated smart contract escrow releases.
+            <p className="text-xs text-muted-foreground mt-1 font-mono">
+              Top up hiring funds in Polygon (POL), fund student MicroGigs, and execute automated smart contract escrow releases.
             </p>
           </div>
 
@@ -317,7 +303,7 @@ export default function RecruiterWallet() {
               size="sm"
               onClick={fetchWalletData}
               disabled={loading}
-              className="gap-1.5 font-mono text-xs"
+              className="gap-1.5 font-mono text-xs text-foreground border-border"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
             </Button>
@@ -325,58 +311,60 @@ export default function RecruiterWallet() {
               variant="outline"
               size="sm"
               onClick={() => setWithdrawOpen(true)}
-              className="font-mono text-xs font-semibold gap-1.5 border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+              className="font-mono text-xs font-semibold gap-1.5 border-amber-600/40 text-amber-800 dark:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20"
             >
               <ArrowUpRight className="h-4 w-4" /> Withdraw Funds
             </Button>
             <Button
               size="sm"
               onClick={() => setTopUpOpen(true)}
-              className="bg-primary text-primary-foreground font-mono text-xs font-semibold gap-1.5"
+              className="bg-primary text-primary-foreground font-mono text-xs font-semibold gap-1.5 shadow-sm"
             >
-              <Plus className="h-4 w-4" /> Top-up Wallet (INR)
+              <Plus className="h-4 w-4" /> Top-up Wallet (INR → POL)
             </Button>
           </div>
         </div>
 
         {/* Balance Hero Card */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {/* Main Balance Card */}
-          <div className="md:col-span-2 p-6 rounded-2xl bg-gradient-to-br from-[#14161A] to-[#0A0B0D] border border-border relative overflow-hidden shadow-sm">
-            <div className="absolute top-0 right-0 p-6 opacity-10 pointer-events-none">
-              <Coins className="w-36 h-36 text-primary" />
+          {/* Main Balance Card (Guaranteed 100% Crisp Contrast) */}
+          <div className="md:col-span-2 p-6 rounded-2xl bg-gradient-to-br from-[#1b0d38] via-[#251347] to-[#120824] border border-purple-500/40 text-white relative overflow-hidden shadow-xl">
+            <div className="absolute top-0 right-0 p-6 opacity-15 pointer-events-none">
+              <Coins className="w-36 h-36 text-purple-300" />
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 relative z-10">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-                  Available Treasury Balance
+                <span className="text-xs font-mono uppercase tracking-wider text-purple-200 font-semibold">
+                  Available Polygon Treasury Balance
                 </span>
-                <span className="flex items-center gap-1.5 text-xs text-emerald-400 font-mono">
-                  <Shield className="h-3.5 w-3.5" /> 100% Non-Custodial Backed
+                <span className="flex items-center gap-1.5 text-xs text-emerald-300 font-mono bg-emerald-500/20 px-2.5 py-1 rounded-full border border-emerald-400/40 font-medium">
+                  <Shield className="h-3.5 w-3.5" /> 100% Polygon Non-Custodial
                 </span>
               </div>
 
               <div>
-                <div className="text-4xl font-extrabold font-mono text-foreground tracking-tight">
-                  ${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
-                  <span className="text-xl text-primary font-bold">USDC</span>
+                <div className="text-4xl sm:text-5xl font-black font-mono text-white tracking-tight flex items-baseline gap-2">
+                  {balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <span className="text-2xl text-purple-300 font-bold">POL</span>
                 </div>
-                <div className="text-xs text-muted-foreground font-mono mt-1">
-                  ≈ ₹{(balance * 86).toLocaleString('en-IN')} INR equivalent available for bounties
+                <div className="text-xs text-purple-200/90 font-mono mt-1.5 flex items-center gap-2">
+                  <span>≈ ₹{(balance * 35).toLocaleString('en-IN')} INR equivalent on Polygon Amoy Testnet</span>
+                  <span>•</span>
+                  <span className="text-emerald-300">Active Escrow Ready</span>
                 </div>
               </div>
 
-              {/* Custodial Address Bar */}
+              {/* Custodial Address Bar (High Contrast) */}
               <div className="pt-2">
-                <span className="text-[11px] font-mono text-muted-foreground block mb-1.5">
-                  Deposit Address (Polygon Amoy / Mainnet)
+                <span className="text-[11px] font-mono text-purple-200/80 block mb-1.5 font-medium">
+                  Polygon Escrow Smart Account Address (Amoy / Mainnet)
                 </span>
-                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-[#0A0B0D] border border-border/80 font-mono text-xs text-foreground/90 max-w-lg">
-                  <span className="truncate flex-1">{walletAddress || 'Generating secure keypair...'}</span>
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-black/50 border border-purple-400/40 font-mono text-xs text-white max-w-lg shadow-inner">
+                  <span className="truncate flex-1 font-mono text-zinc-100">{walletAddress || 'Generating secure keypair...'}</span>
                   <button
                     onClick={copyAddress}
-                    className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                    className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-purple-200 hover:text-white transition-colors"
                     title="Copy Address"
                   >
                     <Copy className="h-3.5 w-3.5" />
@@ -386,8 +374,8 @@ export default function RecruiterWallet() {
                       href={explorerAddressUrl(walletAddress)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-                      title="View on Polygon Explorer"
+                      className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-purple-200 hover:text-white transition-colors"
+                      title="View on Polygonscan"
                     >
                       <ExternalLink className="h-3.5 w-3.5" />
                     </a>
@@ -398,24 +386,24 @@ export default function RecruiterWallet() {
           </div>
 
           {/* Quick Metrics & Escrow Info */}
-          <div className="p-6 rounded-2xl bg-surface border border-border flex flex-col justify-between space-y-4">
+          <div className="p-6 rounded-2xl bg-card border border-border shadow-sm flex flex-col justify-between space-y-4">
             <div>
               <h3 className="text-sm font-bold text-foreground font-mono flex items-center gap-2">
                 <Lock className="h-4 w-4 text-amber-500" /> Active Bounty Escrows
               </h3>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-xs text-muted-foreground mt-1 font-mono">
                 Funds locked in student deliverables awaiting milestone review.
               </p>
             </div>
 
             <div className="space-y-3">
-              <div className="flex items-center justify-between text-xs font-mono p-2.5 rounded-lg bg-secondary/30 border border-border/60">
+              <div className="flex items-center justify-between text-xs font-mono p-2.5 rounded-lg bg-secondary/50 border border-border/60">
                 <span className="text-muted-foreground">Active MicroGigs:</span>
                 <span className="font-bold text-foreground">3 In-Progress</span>
               </div>
-              <div className="flex items-center justify-between text-xs font-mono p-2.5 rounded-lg bg-secondary/30 border border-border/60">
+              <div className="flex items-center justify-between text-xs font-mono p-2.5 rounded-lg bg-secondary/50 border border-border/60">
                 <span className="text-muted-foreground">Locked in Escrow:</span>
-                <span className="font-bold text-amber-400">$650.00 USDC</span>
+                <span className="font-bold text-amber-700 dark:text-amber-400">650.00 POL</span>
               </div>
             </div>
 
@@ -423,37 +411,37 @@ export default function RecruiterWallet() {
               variant="outline"
               size="sm"
               onClick={() => setTopUpOpen(true)}
-              className="w-full text-xs font-mono gap-1.5"
+              className="w-full text-xs font-mono gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
             >
-              <CreditCard className="h-3.5 w-3.5 text-primary" /> Instant INR Deposit
+              <CreditCard className="h-3.5 w-3.5" /> Instant INR → POL Deposit
             </Button>
           </div>
         </div>
 
-        {/* Transaction History Section */}
-        <div className="bg-surface border border-border rounded-xl p-6 space-y-4">
+        {/* Transaction History Section (Clean High-Contrast Roster) */}
+        <div className="bg-card border border-border rounded-xl p-6 space-y-4 shadow-sm">
           <div className="flex items-center justify-between border-b border-border/60 pb-4">
             <div>
               <h2 className="text-base font-bold text-foreground font-mono flex items-center gap-2">
-                <History className="h-4 w-4 text-primary" /> Escrow & Deposit Activity
+                <History className="h-4 w-4 text-primary" /> Polygon Escrow & Deposit Activity
               </h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Audit trail of Razorpay top-ups, smart contract escrows, and verified student payouts.
+              <p className="text-xs text-muted-foreground mt-0.5 font-mono">
+                Audit trail of Razorpay top-ups converted to POL, smart contract escrows, and student payouts.
               </p>
             </div>
-            <Badge variant="outline" className="text-xs font-mono">
+            <Badge variant="outline" className="text-xs font-mono text-foreground border-border">
               {transactions.length} Records
             </Badge>
           </div>
 
-          <div className="divide-y divide-border/40">
+          <div className="divide-y divide-border/60">
             {transactions.length > 0 ? (
               transactions.map((tx) => (
                 <div key={tx.id} className="py-3.5 flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 ${
                       tx.type === 'TOPUP'
-                        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                        ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
                         : 'bg-primary/15 text-primary border border-primary/30'
                     }`}>
                       {tx.type === 'TOPUP' ? (
@@ -463,7 +451,7 @@ export default function RecruiterWallet() {
                       )}
                     </div>
                     <div className="min-w-0">
-                      <div className="font-medium text-xs text-foreground truncate font-mono">
+                      <div className="font-semibold text-xs text-foreground truncate font-mono">
                         {tx.label}
                       </div>
                       <div className="text-[11px] text-muted-foreground font-mono mt-0.5 flex items-center gap-2">
@@ -471,7 +459,7 @@ export default function RecruiterWallet() {
                         {tx.network && (
                           <>
                             <span>•</span>
-                            <span className="text-muted-foreground/80">{tx.network}</span>
+                            <span className="text-muted-foreground font-medium">{tx.network}</span>
                           </>
                         )}
                         {tx.txHash && (
@@ -486,11 +474,14 @@ export default function RecruiterWallet() {
 
                   <div className="text-right shrink-0">
                     <div className={`text-xs font-mono font-bold ${
-                      tx.amount.startsWith('+') ? 'text-emerald-400' : 'text-foreground'
+                      tx.amount.startsWith('+')
+                        ? 'text-emerald-700 dark:text-emerald-400'
+                        : 'text-foreground'
                     }`}>
-                      {tx.amount}
+                      {/* Ensure POL token label is displayed */}
+                      {tx.amount.includes('USDC') ? tx.amount.replace('USDC', 'POL') : tx.amount}
                     </div>
-                    <Badge variant="outline" className="text-[10px] font-mono capitalize border-border/80 mt-0.5">
+                    <Badge variant="outline" className="text-[10px] font-mono capitalize border-border text-foreground mt-0.5">
                       {tx.status}
                     </Badge>
                   </div>
@@ -498,38 +489,38 @@ export default function RecruiterWallet() {
               ))
             ) : (
               <div className="py-8 text-center text-xs text-muted-foreground font-mono">
-                No transactions recorded yet. Click "Top-up Wallet" to add funds.
+                No transactions recorded yet. Click "Top-up Wallet" to add POL funds.
               </div>
             )}
           </div>
         </div>
 
-        {/* Top-up Dialog */}
+        {/* Top-up Dialog (Clean High-Contrast Theme) */}
         <Dialog open={topUpOpen} onOpenChange={setTopUpOpen}>
-          <DialogContent className="bg-[#14161A] border-[#2A2D33] text-[#F2F3F5] max-w-md">
+          <DialogContent className="bg-card border-border text-foreground max-w-md shadow-2xl">
             <DialogHeader>
-              <DialogTitle className="text-base font-bold flex items-center gap-2 font-mono">
+              <DialogTitle className="text-base font-bold flex items-center gap-2 font-mono text-foreground">
                 <CreditCard className="h-4 w-4 text-primary" />
-                Top-Up Recruiter Treasury
+                Top-Up Recruiter Treasury (INR → POL)
               </DialogTitle>
-              <DialogDescription className="text-xs text-[#8A8F98]">
-                Add hiring funds via Razorpay UPI / Cards. Funds are converted 1:1 to on-chain test USDC ready for MicroGig escrow locks.
+              <DialogDescription className="text-xs text-muted-foreground font-mono">
+                Deposit hiring funds via Razorpay UPI / Cards. Funds are converted into Polygon (POL) native tokens ready for on-chain MicroGig escrow locks.
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 mt-2">
               <div className="space-y-1.5">
-                <label className="text-xs font-mono text-foreground font-medium">
+                <label className="text-xs font-mono text-foreground font-semibold">
                   Deposit Amount (INR)
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-xs text-muted-foreground font-mono">₹</span>
+                  <span className="absolute left-3 top-2.5 text-xs text-muted-foreground font-mono font-bold">₹</span>
                   <Input
                     type="number"
                     value={topUpAmount}
                     onChange={(e) => setTopUpAmount(e.target.value)}
                     placeholder="5000"
-                    className="bg-[#0A0B0D] border-[#2A2D33] pl-7 text-xs font-mono"
+                    className="bg-background border-input pl-7 text-xs font-mono text-foreground"
                   />
                 </div>
               </div>
@@ -543,8 +534,10 @@ export default function RecruiterWallet() {
                     variant="outline"
                     size="sm"
                     onClick={() => setTopUpAmount(amt)}
-                    className={`font-mono text-xs ${
-                      topUpAmount === amt ? 'border-primary text-primary bg-primary/10' : 'border-[#2A2D33]'
+                    className={`font-mono text-xs font-semibold ${
+                      topUpAmount === amt
+                        ? 'border-primary text-primary bg-primary/10'
+                        : 'border-border text-foreground hover:bg-secondary'
                     }`}
                   >
                     ₹{parseInt(amt).toLocaleString('en-IN')}
@@ -552,26 +545,26 @@ export default function RecruiterWallet() {
                 ))}
               </div>
 
-              <div className="p-3 rounded-lg bg-[#0A0B0D] border border-[#2A2D33] text-xs font-mono space-y-1.5">
+              <div className="p-3.5 rounded-xl bg-secondary/50 border border-border text-xs font-mono space-y-1.5">
                 <div className="flex items-center justify-between text-muted-foreground">
-                  <span>Exchange Rate:</span>
-                  <span className="text-foreground">1 INR = 1 USDC (Sandbox)</span>
+                  <span>Exchange Route:</span>
+                  <span className="text-foreground font-medium">1 INR = 1 POL (Testnet Rate)</span>
                 </div>
                 <div className="flex items-center justify-between text-muted-foreground">
                   <span>You will receive:</span>
-                  <span className="text-primary font-bold">
-                    +{(parseFloat(topUpAmount) || 0).toLocaleString()} USDC
+                  <span className="text-purple-600 dark:text-purple-400 font-extrabold text-sm">
+                    +{(parseFloat(topUpAmount) || 0).toLocaleString()} POL
                   </span>
                 </div>
               </div>
             </div>
 
-            <DialogFooter className="mt-4 pt-3 border-t border-[#2A2D33]">
+            <DialogFooter className="mt-4 pt-3 border-t border-border">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setTopUpOpen(false)}
-                className="font-mono text-xs"
+                className="font-mono text-xs text-foreground"
                 disabled={isProcessingTopUp}
               >
                 Cancel
@@ -587,22 +580,22 @@ export default function RecruiterWallet() {
                     <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Processing...
                   </>
                 ) : (
-                  `Pay ₹${(parseFloat(topUpAmount) || 0).toLocaleString('en-IN')} via Razorpay`
+                  `Pay ₹${(parseFloat(topUpAmount) || 0).toLocaleString('en-IN')} → Receive POL`
                 )}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
-        {/* Withdrawal Dialog */}
+        {/* Withdrawal Dialog (Clean High-Contrast Theme) */}
         <Dialog open={withdrawOpen} onOpenChange={setWithdrawOpen}>
-          <DialogContent className="bg-[#14161A] border-[#2A2D33] text-[#F2F3F5] max-w-md">
+          <DialogContent className="bg-card border-border text-foreground max-w-md shadow-2xl">
             <DialogHeader>
-              <DialogTitle className="text-base font-bold flex items-center gap-2 font-mono">
-                <ArrowUpRight className="h-4 w-4 text-amber-400" />
-                Withdraw Corporate Treasury
+              <DialogTitle className="text-base font-bold flex items-center gap-2 font-mono text-foreground">
+                <ArrowUpRight className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                Withdraw Polygon Treasury (POL → INR)
               </DialogTitle>
-              <DialogDescription className="text-xs text-[#8A8F98]">
+              <DialogDescription className="text-xs text-muted-foreground font-mono">
                 Remit unallocated hiring funds back to your registered company bank account or corporate UPI ID via instant IMPS transfer.
               </DialogDescription>
             </DialogHeader>
@@ -610,18 +603,18 @@ export default function RecruiterWallet() {
             <div className="space-y-4 mt-2">
               <div className="space-y-1.5">
                 <div className="flex justify-between text-xs font-mono">
-                  <label className="text-foreground font-medium">Withdrawal Amount (USDC)</label>
-                  <span className="text-muted-foreground">Available: ${balance.toLocaleString()} USDC</span>
+                  <label className="text-foreground font-semibold">Withdrawal Amount (POL)</label>
+                  <span className="text-muted-foreground font-medium">Available: {balance.toLocaleString()} POL</span>
                 </div>
                 <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-xs text-muted-foreground font-mono">$</span>
                   <Input
                     type="number"
                     value={withdrawAmount}
                     onChange={(e) => setWithdrawAmount(e.target.value)}
                     placeholder="1000"
-                    className="bg-[#0A0B0D] border-[#2A2D33] pl-7 text-xs font-mono"
+                    className="bg-background border-input text-xs font-mono text-foreground"
                   />
+                  <span className="absolute right-3 top-2.5 text-xs text-purple-600 dark:text-purple-400 font-mono font-bold">POL</span>
                 </div>
               </div>
 
@@ -632,8 +625,10 @@ export default function RecruiterWallet() {
                   variant="outline"
                   size="sm"
                   onClick={() => setWithdrawMethod('upi')}
-                  className={`font-mono text-xs ${
-                    withdrawMethod === 'upi' ? 'border-primary text-primary bg-primary/10' : 'border-[#2A2D33]'
+                  className={`font-mono text-xs font-semibold ${
+                    withdrawMethod === 'upi'
+                      ? 'border-primary text-primary bg-primary/10'
+                      : 'border-border text-foreground hover:bg-secondary'
                   }`}
                 >
                   UPI (Instant)
@@ -643,8 +638,10 @@ export default function RecruiterWallet() {
                   variant="outline"
                   size="sm"
                   onClick={() => setWithdrawMethod('bank')}
-                  className={`font-mono text-xs ${
-                    withdrawMethod === 'bank' ? 'border-primary text-primary bg-primary/10' : 'border-[#2A2D33]'
+                  className={`font-mono text-xs font-semibold ${
+                    withdrawMethod === 'bank'
+                      ? 'border-primary text-primary bg-primary/10'
+                      : 'border-border text-foreground hover:bg-secondary'
                   }`}
                 >
                   Bank Transfer (NEFT/IMPS)
@@ -652,37 +649,37 @@ export default function RecruiterWallet() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-mono text-foreground font-medium">
+                <label className="text-xs font-mono text-foreground font-semibold">
                   {withdrawMethod === 'upi' ? 'Destination UPI ID' : 'Bank Account Number & IFSC'}
                 </label>
                 <Input
                   value={withdrawDestination}
                   onChange={(e) => setWithdrawDestination(e.target.value)}
                   placeholder={withdrawMethod === 'upi' ? 'e.g. finance@hdfcbank' : 'e.g. 50100421987654 (HDFC0000123)'}
-                  className="bg-[#0A0B0D] border-[#2A2D33] text-xs font-mono"
+                  className="bg-background border-input text-xs font-mono text-foreground"
                 />
               </div>
 
-              <div className="p-3 rounded-lg bg-[#0A0B0D] border border-[#2A2D33] text-xs font-mono space-y-1.5">
+              <div className="p-3.5 rounded-xl bg-secondary/50 border border-border text-xs font-mono space-y-1.5">
                 <div className="flex items-center justify-between text-muted-foreground">
                   <span>Settlement Route:</span>
-                  <span className="text-foreground">Direct Corporate Remittance (IMPS)</span>
+                  <span className="text-foreground font-medium">Direct Corporate Remittance (IMPS)</span>
                 </div>
                 <div className="flex items-center justify-between text-muted-foreground">
                   <span>Estimated INR Received:</span>
-                  <span className="text-amber-400 font-bold">
-                    ≈ ₹{Math.round((parseFloat(withdrawAmount) || 0) * 86).toLocaleString('en-IN')} INR
+                  <span className="text-amber-700 dark:text-amber-400 font-bold text-sm">
+                    ≈ ₹{Math.round((parseFloat(withdrawAmount) || 0) * 35).toLocaleString('en-IN')} INR
                   </span>
                 </div>
               </div>
             </div>
 
-            <DialogFooter className="mt-4 pt-3 border-t border-[#2A2D33]">
+            <DialogFooter className="mt-4 pt-3 border-t border-border">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setWithdrawOpen(false)}
-                className="font-mono text-xs"
+                className="font-mono text-xs text-foreground"
                 disabled={isProcessingWithdraw}
               >
                 Cancel
@@ -691,14 +688,14 @@ export default function RecruiterWallet() {
                 size="sm"
                 onClick={handleWithdraw}
                 disabled={isProcessingWithdraw || !withdrawAmount || (parseFloat(withdrawAmount) || 0) > balance}
-                className="bg-amber-600 hover:bg-amber-500 text-white font-mono text-xs font-semibold gap-1.5"
+                className="bg-amber-600 hover:bg-amber-500 text-white font-mono text-xs font-semibold gap-1.5 shadow-sm"
               >
                 {isProcessingWithdraw ? (
                   <>
                     <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Remitting...
                   </>
                 ) : (
-                  `Withdraw $${(parseFloat(withdrawAmount) || 0).toLocaleString()} USDC`
+                  `Withdraw ${(parseFloat(withdrawAmount) || 0).toLocaleString()} POL`
                 )}
               </Button>
             </DialogFooter>
@@ -712,7 +709,7 @@ export default function RecruiterWallet() {
           amountInr={pendingRazorpayOrder.amount}
           orderId={pendingRazorpayOrder.orderId}
           keyId={pendingRazorpayOrder.keyId}
-          merchantName="Almadox Escrow & Treasury"
+          merchantName="Almadox Polygon Escrow Treasury"
           prefillEmail={(session?.user as any)?.email || 'recruiter@techcorp.com'}
           prefillName={session?.user?.name || 'Recruiter'}
           onSuccess={handleRazorpaySuccess}

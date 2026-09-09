@@ -137,19 +137,19 @@ export async function simulateMintSBT(
 export interface GigPayoutResult {
   txHash: string;
   amountPOL: string;
-  amountUSDC: string;
+  amountUSDC?: string;
   toAddress: string;
 }
 
 export async function simulateGigPayout(
   toAddress: string,
-  rewardUSDC: number,
+  rewardPOL: number,
 ): Promise<GigPayoutResult> {
   await new Promise(r => setTimeout(r, 1800));
-  const amountPOL = (rewardUSDC * 0.8).toFixed(4);
-  const seed = `payout-${toAddress}-${rewardUSDC}-${Date.now()}`;
+  const amountPOL = rewardPOL.toFixed(2);
+  const seed = `payout-${toAddress}-${rewardPOL}-${Date.now()}`;
   const txHash = '0x' + ethers.utils.keccak256(ethers.utils.toUtf8Bytes(seed)).slice(2);
-  return { txHash, amountPOL, amountUSDC: rewardUSDC.toString(), toAddress };
+  return { txHash, amountPOL, amountUSDC: rewardPOL.toString(), toAddress };
 }
 
 // ─── Transaction Log (local session storage) ──────────────────────────────────

@@ -47,7 +47,7 @@ export default function StudentWallet() {
   const [upiId, setUpiId] = useState('student@okaxis');
 
   // Static balances (would be fetched from API in production)
-  const usdcBalance = 300.0;
+  const polEarnings = 350.0;
 
   // Generate wallet from userId on mount
   useEffect(() => {
@@ -128,17 +128,17 @@ export default function StudentWallet() {
 
   const handleOffRamp = async () => {
     const n = parseFloat(offRampAmount);
-    if (isNaN(n) || n <= 0 || n > usdcBalance) { toast.error(`Enter a valid amount up to $${usdcBalance}`); return; }
+    if (isNaN(n) || n <= 0 || n > polEarnings) { toast.error(`Enter a valid amount up to ${polEarnings} POL`); return; }
     if (!upiId.includes('@')) { toast.error('Enter a valid UPI ID'); return; }
 
-    const inrValue = Math.round(n * 86);
+    const inrValue = Math.round(n * 35);
 
     // Save transaction
     saveTxRecord({
       hash: `wth_${Date.now().toString(36)}`,
       type: 'PAYOUT',
       label: `Student UPI Withdrawal to ${upiId}`,
-      amount: `${n}`,
+      amount: `-${n} POL`,
       timestamp: Date.now(),
       status: 'confirmed',
       network: 'Polygon Amoy (IMPS Off-Ramp)',
@@ -149,12 +149,12 @@ export default function StudentWallet() {
       userId,
       type: 'withdrawal',
       title: '💸 Earnings Withdrawn via UPI',
-      body: `Your withdrawal of ₹${inrValue.toLocaleString('en-IN')} ($${n} USDC) has been successfully remitted to ${upiId} via IMPS.`,
+      body: `Your withdrawal of ${n} POL (₹${inrValue.toLocaleString('en-IN')}) has been successfully remitted to ${upiId} via IMPS.`,
       meta: { amount: n, inrValue, upiId },
     }).catch(() => null);
 
     setOffRampOpen(false);
-    toast.success(`💸 Withdrawal completed! ₹${inrValue.toLocaleString('en-IN')} INR sent to ${upiId} via IMPS`);
+    toast.success(`💸 Withdrawal completed! ₹${inrValue.toLocaleString('en-IN')} INR (${n} POL) sent to ${upiId} via IMPS`);
   };
 
   return (
@@ -211,13 +211,13 @@ export default function StudentWallet() {
                 <div className="text-[11px] text-muted-foreground">Polygon Amoy (live)</div>
               </div>
 
-              {/* USDC Balance */}
+              {/* POL Earnings */}
               <div className="p-4 rounded-xl bg-card border border-border/80 shadow-sm min-w-[160px] space-y-1">
                 <span className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Coins className="h-3.5 w-3.5 text-emerald-500" /> USDC Earnings
+                  <Coins className="h-3.5 w-3.5 text-purple-500" /> POL Earnings
                 </span>
-                <div className="text-2xl font-black text-foreground">${usdcBalance.toFixed(2)}</div>
-                <div className="text-[11px] text-emerald-600">≈ ₹{(usdcBalance * 86).toLocaleString()} INR</div>
+                <div className="text-2xl font-black text-foreground">{polEarnings.toFixed(2)} POL</div>
+                <div className="text-[11px] text-purple-700 dark:text-purple-300 font-medium">≈ ₹{(polEarnings * 35).toLocaleString('en-IN')} INR</div>
                 <Button size="sm" onClick={() => setOffRampOpen(true)} className="w-full mt-2 h-7 text-xs gap-1">
                   Off-Ramp to INR <ArrowUpRight className="h-3 w-3" />
                 </Button>
@@ -400,18 +400,18 @@ export default function StudentWallet() {
         <Dialog open={offRampOpen} onOpenChange={setOffRampOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2"><Coins className="h-5 w-5 text-emerald-500" /> Off-Ramp USDC to INR</DialogTitle>
-              <DialogDescription>Convert your MicroGig earnings to Indian Rupees via UPI.</DialogDescription>
+              <DialogTitle className="flex items-center gap-2"><Coins className="h-5 w-5 text-purple-500" /> Off-Ramp POL to INR</DialogTitle>
+              <DialogDescription>Convert your MicroGig POL earnings directly to Indian Rupees via UPI.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-2">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">Amount in USDC (Max: ${usdcBalance})</label>
+                <label className="text-xs font-semibold text-foreground">Amount in POL (Max: {polEarnings} POL)</label>
                 <div className="relative">
-                  <input type="number" max={usdcBalance} min={10} value={offRampAmount} onChange={e => setOffRampAmount(e.target.value)}
+                  <input type="number" max={polEarnings} min={1} value={offRampAmount} onChange={e => setOffRampAmount(e.target.value)}
                     className="w-full rounded-md border border-input bg-background p-2.5 text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-primary" />
-                  <button onClick={() => setOffRampAmount(usdcBalance.toString())} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-primary font-semibold hover:underline">MAX</button>
+                  <button onClick={() => setOffRampAmount(polEarnings.toString())} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-primary font-semibold hover:underline">MAX</button>
                 </div>
-                <p className="text-[11px] text-muted-foreground">≈ <strong className="text-foreground">₹{(parseFloat(offRampAmount || '0') * 86).toLocaleString()} INR</strong> (1 USDC = ₹86.00)</p>
+                <p className="text-[11px] text-muted-foreground">≈ <strong className="text-foreground">₹{(parseFloat(offRampAmount || '0') * 35).toLocaleString('en-IN')} INR</strong> (1 POL ≈ ₹35.00)</p>
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-foreground">UPI ID / VPA</label>
@@ -419,7 +419,7 @@ export default function StudentWallet() {
                   className="w-full rounded-md border border-input bg-background p-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
               </div>
               <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-3 text-[11px] text-emerald-700 dark:text-emerald-400">
-                ⚡ Instant IMPS settlement via licensed off-ramp gateway. No gas fees deducted.
+                ⚡ Instant IMPS settlement via licensed Polygon off-ramp gateway. No gas fees deducted.
               </div>
             </div>
             <DialogFooter>

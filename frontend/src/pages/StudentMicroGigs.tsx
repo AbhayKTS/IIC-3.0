@@ -22,7 +22,7 @@ const INITIAL_SEED_GIGS: Gig[] = [
     title: 'Smart Contract Audit & Test Coverage for DeFi Escrow',
     description: 'Review Solidity contracts for an automated escrow disbursement module. Write Foundry test suites with >90% branch coverage and submit gas optimization report.',
     skills: ['Solidity', 'Foundry', 'Polygon', 'Smart Contracts'],
-    reward: 180, // USDC
+    reward: 180, // POL
     deadline: '2026-09-20',
     mode: 'remote',
     category: 'Web3 & Blockchain',
@@ -36,7 +36,7 @@ const INITIAL_SEED_GIGS: Gig[] = [
     title: 'React + Tailwind Dashboard Component for MUJ Innovation Hub',
     description: 'Build an interactive live analytics chart component displaying campus hackathon metrics and real-time team registrations using Recharts and Tailwind CSS.',
     skills: ['React', 'TypeScript', 'Tailwind CSS', 'Recharts'],
-    reward: 120, // USDC
+    reward: 120, // POL
     deadline: '2026-09-18',
     mode: 'on-campus',
     category: 'Frontend Engineering',
@@ -50,7 +50,7 @@ const INITIAL_SEED_GIGS: Gig[] = [
     title: 'LLM Resume Embeddings Pipeline with Vector Search',
     description: 'Implement a Python FastAPI microservice that parses candidate resumes, computes embeddings via OpenAI / HuggingFace, and indexes them into Pinecone/Qdrant.',
     skills: ['Python', 'FastAPI', 'OpenAI', 'Vector DB', 'PyTorch'],
-    reward: 250, // USDC
+    reward: 250, // POL
     deadline: '2026-09-25',
     mode: 'remote',
     category: 'AI / Machine Learning',
@@ -64,7 +64,7 @@ const INITIAL_SEED_GIGS: Gig[] = [
     title: 'Cross-Platform Mobile Auth Integration (Flutter)',
     description: 'Integrate Firebase Auth + Google Sign-In with deep linking and biometric lock screen for our campus student companion app.',
     skills: ['Flutter', 'Dart', 'Firebase Auth', 'Mobile'],
-    reward: 150, // USDC
+    reward: 150, // POL
     deadline: '2026-09-22',
     mode: 'remote',
     category: 'Mobile Development',
@@ -184,8 +184,8 @@ export default function StudentMicroGigs() {
       }
 
       // Simulate Web3 payout to student's Polygon wallet
-      const rewardUSDC = gig?.reward || 150;
-      const payout = await simulateGigPayout(walletAddress || '0x0', rewardUSDC);
+      const rewardPOL = gig?.reward || 150;
+      const payout = await simulateGigPayout(walletAddress || '0x0', rewardPOL);
       setLastTxHash(payout.txHash);
       
       // Save tx to local history log
@@ -193,7 +193,7 @@ export default function StudentMicroGigs() {
         hash: payout.txHash,
         type: 'GIG_PAYOUT',
         label: `MicroGig Reward: ${gig?.title || 'Task'}`,
-        amount: payout.amountPOL,
+        amount: `+${payout.amountPOL} POL`,
         timestamp: Date.now(),
         status: 'confirmed',
         network: 'Polygon Amoy Testnet',
@@ -206,7 +206,7 @@ export default function StudentMicroGigs() {
       );
 
       toast.success(
-        `✅ Deliverable submitted! ${payout.amountPOL} POL ($${rewardUSDC} USDC) sent to your Polygon wallet.`,
+        `✅ Deliverable submitted! ${payout.amountPOL} POL sent to your Polygon wallet.`,
         {
           duration: 8000,
           action: {
@@ -240,7 +240,7 @@ export default function StudentMicroGigs() {
   const activeApplications = applications.filter((a) => a.status === 'applied' || a.status === 'accepted');
   const completedApplications = applications.filter((a) => a.status === 'completed');
 
-  const totalEarnedUsd = completedApplications.reduce((acc, curr) => {
+  const totalEarnedPol = completedApplications.reduce((acc, curr) => {
     const gig = gigs.find((g) => g.id === curr.gigId);
     return acc + (gig ? gig.reward : 150);
   }, 0);
@@ -260,7 +260,7 @@ export default function StudentMicroGigs() {
                 Paid Micro-Gigs & Work Portfolio
               </h1>
               <p className="text-muted-foreground text-sm leading-relaxed">
-                Build an undeniable, on-chain work portfolio. Complete industry-sponsored tasks, get rated on real deliverables, and receive crypto payments (USDC / MATIC) directly off-rampable to INR.
+                Build an undeniable, on-chain work portfolio. Complete industry-sponsored tasks, get rated on real deliverables, and receive Polygon (POL) rewards directly off-rampable to INR.
               </p>
             </div>
 
@@ -268,8 +268,8 @@ export default function StudentMicroGigs() {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div className="p-3 rounded-xl bg-card border border-border/70 shadow-sm text-center">
                 <span className="text-xs text-muted-foreground block">Total Earned</span>
-                <span className="text-lg font-bold text-emerald-500">
-                  ${totalEarnedUsd} <span className="text-xs font-normal text-muted-foreground">(₹{(totalEarnedUsd * 86).toLocaleString()})</span>
+                <span className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                  {totalEarnedPol} POL <span className="text-xs font-normal text-muted-foreground">(≈ ₹{(totalEarnedPol * 35).toLocaleString('en-IN')})</span>
                 </span>
               </div>
               <div className="p-3 rounded-xl bg-card border border-border/70 shadow-sm text-center">
@@ -377,11 +377,10 @@ export default function StudentMicroGigs() {
                         </h3>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <div className="text-base font-extrabold text-emerald-500 flex items-center gap-0.5 justify-end">
-                          <Coins className="h-4 w-4" /> ${gig.reward} USDC
+                        <div className="text-base font-extrabold text-purple-600 dark:text-purple-400 flex items-center gap-1 justify-end">
+                          <Coins className="h-4 w-4" /> {gig.reward} POL
                         </div>
-                        <div className="text-[11px] text-violet-500 font-semibold">{(gig.reward * 0.8).toFixed(2)} POL</div>
-                        <span className="text-[11px] text-muted-foreground">≈ ₹{gig.reward * 86}</span>
+                        <span className="text-[11px] text-muted-foreground block">≈ ₹{(gig.reward * 35).toLocaleString('en-IN')} INR</span>
                       </div>
                     </div>
 
@@ -470,7 +469,7 @@ export default function StudentMicroGigs() {
                           {gig?.description}
                         </p>
                         <div className="flex items-center gap-4 text-xs text-muted-foreground pt-1">
-                          <span className="text-emerald-500 font-semibold">Reward: ${gig?.reward || 150} USDC</span>
+                          <span className="text-purple-600 dark:text-purple-400 font-semibold">Reward: {gig?.reward || 150} POL</span>
                           <span>Deadline: {gig?.deadline || 'Flexible'}</span>
                         </div>
                       </div>
@@ -527,7 +526,7 @@ export default function StudentMicroGigs() {
                         </div>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Deliverable accepted. Payout of <strong className="text-emerald-500">${gig?.reward || 150} USDC ({((gig?.reward || 150) * 0.8).toFixed(2)} POL)</strong> sent to your Polygon Amoy wallet.
+                        Deliverable accepted. Payout of <strong className="text-purple-600 dark:text-purple-400 font-bold">{gig?.reward || 150} POL (≈ ₹{((gig?.reward || 150) * 35).toLocaleString('en-IN')} INR)</strong> sent to your Polygon Amoy wallet.
                       </p>
                     </div>
                   );
@@ -545,7 +544,7 @@ export default function StudentMicroGigs() {
                 <Zap className="h-5 w-5 text-primary" /> Apply for Micro-Gig
               </DialogTitle>
               <DialogDescription>
-                {selectedGig?.title} (${selectedGig?.reward} USDC)
+                {selectedGig?.title} ({selectedGig?.reward} POL)
               </DialogDescription>
             </DialogHeader>
 

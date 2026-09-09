@@ -20,7 +20,7 @@ const RECRUITER_PARTNERS = [
     hiredCount: 14,
     rating: 4.9,
     status: 'Active Partner',
-    bountiesPaid: '$18,400 USDC',
+    bountiesPaid: '18,400 POL',
   },
   {
     name: 'Microsoft India',
@@ -28,7 +28,7 @@ const RECRUITER_PARTNERS = [
     hiredCount: 22,
     rating: 4.8,
     status: 'Active Partner',
-    bountiesPaid: '$26,000 USDC',
+    bountiesPaid: '26,000 POL',
   },
   {
     name: 'Google DeepMind',
@@ -36,7 +36,7 @@ const RECRUITER_PARTNERS = [
     hiredCount: 6,
     rating: 5.0,
     status: 'Research Partner',
-    bountiesPaid: '$12,500 USDC',
+    bountiesPaid: '12,500 POL',
   },
   {
     name: 'CRED',
@@ -44,7 +44,7 @@ const RECRUITER_PARTNERS = [
     hiredCount: 11,
     rating: 4.9,
     status: 'Active Partner',
-    bountiesPaid: '$15,000 USDC',
+    bountiesPaid: '15,000 POL',
   },
 ];
 
@@ -98,7 +98,7 @@ export default function CollegeRecruiters() {
 
               <div className="pt-4 border-t border-border/40 flex items-center justify-between text-xs text-muted-foreground">
                 <span>Total Students Hired: <strong className="text-foreground">{rec.hiredCount}</strong></span>
-                <span className="text-emerald-500 font-semibold">{rec.bountiesPaid} Disbursed</span>
+                <span className="text-purple-600 dark:text-purple-400 font-semibold">{rec.bountiesPaid} Disbursed</span>
               </div>
             </div>
           ))}

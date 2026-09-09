@@ -167,7 +167,7 @@ const handleWebhook = async (req, res, next) => {
         userId,
         type: 'TOPUP',
         label: `Wallet Top-up via Razorpay (₹${amountInr.toLocaleString('en-IN')})`,
-        amount: `+${tokensToAdd} USDC`,
+        amount: `+${tokensToAdd} POL`,
         timestamp: Date.now(),
         status: 'confirmed',
         network: 'Fiat/INR (Razorpay)',

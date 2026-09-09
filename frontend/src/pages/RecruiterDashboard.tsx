@@ -195,9 +195,9 @@ export default function RecruiterDashboard() {
           <div className="glass-card p-4 rounded-xl border border-border/80 space-y-1">
             <div className="flex items-center justify-between text-muted-foreground text-xs font-mono">
               <span>Corporate Treasury</span>
-              <ShieldCheck className="h-4 w-4 text-primary" />
+              <ShieldCheck className="h-4 w-4 text-purple-600 dark:text-purple-400" />
             </div>
-            <div className="text-2xl font-black font-mono text-primary">$2,500 USDC</div>
+            <div className="text-2xl font-black font-mono text-purple-600 dark:text-purple-400">15,500 POL</div>
             <div className="text-[11px] text-muted-foreground font-mono">
               Non-custodial smart escrow
             </div>
@@ -205,7 +205,7 @@ export default function RecruiterDashboard() {
         </div>
 
         {/* SECTION 1: MY ACTIVE POSTED GIGS & APPLICANTS PREVIEW */}
-        <div className="glass-card p-6 rounded-2xl border border-border/80 space-y-4 bg-[#121620]/60">
+        <div className="glass-card p-6 rounded-2xl border border-border/80 space-y-4 bg-card/80 shadow-sm">
           <div className="flex items-center justify-between border-b border-border/60 pb-3">
             <div>
               <h2 className="text-base font-bold text-foreground font-mono flex items-center gap-2">
@@ -230,13 +230,13 @@ export default function RecruiterDashboard() {
             {ACTIVE_GIGS_OVERVIEW.map((gig) => (
               <div
                 key={gig.id}
-                className="p-4 rounded-xl bg-[#0A0D14] border border-border/60 flex flex-col justify-between space-y-3 hover:border-primary/40 transition-all cursor-pointer"
+                className="p-4 rounded-xl bg-card border border-border flex flex-col justify-between space-y-3 hover:border-primary/50 transition-all cursor-pointer shadow-sm"
                 onClick={() => navigate('/recruiter/microgigs')}
               >
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-[11px] font-mono">
                     <span className="text-muted-foreground">{gig.category}</span>
-                    <span className="font-extrabold text-emerald-400">${gig.reward} USDC</span>
+                    <span className="font-extrabold text-purple-600 dark:text-purple-400">{gig.reward} POL</span>
                   </div>
                   <h3 className="font-bold text-xs font-mono text-foreground line-clamp-2 leading-snug">
                     {gig.title}
@@ -248,8 +248,8 @@ export default function RecruiterDashboard() {
                     variant="secondary"
                     className={`font-mono text-[10px] ${
                       gig.hasDeliverable
-                        ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                        : 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
+                        ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30'
+                        : 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30'
                     }`}
                   >
                     <Users className="h-3 w-3 mr-1" />
@@ -257,7 +257,7 @@ export default function RecruiterDashboard() {
                     {gig.hasDeliverable && ' • ⚡ Ready'}
                   </Badge>
 
-                  <span className="text-[11px] font-mono text-primary flex items-center gap-0.5 hover:underline">
+                  <span className="text-[11px] font-mono text-primary flex items-center gap-0.5 hover:underline font-semibold">
                     Manage <ArrowRight className="h-3 w-3" />
                   </span>
                 </div>
@@ -292,7 +292,7 @@ export default function RecruiterDashboard() {
             {SEEDED_TOP_STUDENTS.map((st) => (
               <div
                 key={st.id}
-                className="glass-card p-5 rounded-2xl border border-border/80 flex flex-col justify-between space-y-4 shadow-sm bg-[#121620]/60 hover:border-primary/40 transition-all"
+                className="glass-card p-5 rounded-2xl border border-border/80 flex flex-col justify-between space-y-4 shadow-sm bg-card hover:border-primary/50 transition-all"
               >
                 <div className="space-y-3">
                   {/* Avatar & Verification Header */}
@@ -311,7 +311,7 @@ export default function RecruiterDashboard() {
                       </div>
                     </div>
 
-                    <Badge className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono gap-1">
+                    <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-[10px] font-mono gap-1">
                       <ShieldCheck className="h-3 w-3" /> SBT Verified
                     </Badge>
                   </div>
@@ -322,14 +322,14 @@ export default function RecruiterDashboard() {
                   </p>
 
                   {/* Ratings */}
-                  <div className="grid grid-cols-2 gap-2 p-2.5 rounded-lg bg-[#0A0D14] border border-border/60 text-xs font-mono">
+                  <div className="grid grid-cols-2 gap-2 p-2.5 rounded-lg bg-secondary/50 border border-border/60 text-xs font-mono">
                     <div>
                       <span className="text-[10px] text-muted-foreground block">LeetCode Rating</span>
-                      <strong className="text-amber-400">{st.leetcodeRating}</strong>
+                      <strong className="text-amber-700 dark:text-amber-300 font-bold">{st.leetcodeRating}</strong>
                     </div>
                     <div>
                       <span className="text-[10px] text-muted-foreground block">Codeforces</span>
-                      <strong className="text-blue-400">{st.codeforcesRank.split(' ')[0]}</strong>
+                      <strong className="text-blue-700 dark:text-blue-300 font-bold">{st.codeforcesRank.split(' ')[0]}</strong>
                     </div>
                   </div>
 
@@ -338,7 +338,7 @@ export default function RecruiterDashboard() {
                     {st.skills.slice(0, 4).map((skill) => (
                       <span
                         key={skill}
-                        className="px-2 py-0.5 rounded bg-[#1C2333] text-[10px] font-mono text-muted-foreground"
+                        className="px-2 py-0.5 rounded bg-secondary text-[10px] font-mono text-foreground/80 border border-border/40"
                       >
                         {skill}
                       </span>
