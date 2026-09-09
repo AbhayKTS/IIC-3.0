@@ -135,7 +135,70 @@ const parseWithRules = (rawText) => {
 };
 
 /**
- * Azure OpenAI chat completion path
+ * Groq chat completion path (Primary)
+ */
+const parseWithGroq = async (rawText, config) => {
+  const truncated = (rawText || '').slice(0, MAX_RAW_TEXT_LENGTH);
+  const url = 'https://api.groq.com/openai/v1/chat/completions';
+
+  const prompt = `You are an expert resume parser. Extract structured resume data from the text below and respond ONLY with a valid JSON object matching this exact schema:
+{
+  "skills": [{"name": "Skill Name", "category": "technical" | "soft"}],
+  "education": [{"degree": "...", "institution": "...", "year": "..."}],
+  "experience": [{"title": "...", "org": "...", "duration": "...", "description": "..."}],
+  "certifications": ["Certification Name"],
+  "links": {"github": "URL or null", "linkedin": "URL or null", "portfolio": "URL or null"}
+}
+
+Resume Text:
+${truncated}`;
+
+  const response = await axios.post(
+    url,
+    {
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a precise resume parser. Output ONLY valid JSON matching the requested schema. No markdown formatting, no code fences.',
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      temperature: 0.1,
+      response_format: { type: 'json_object' },
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${config.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      timeout: 15000,
+    }
+  );
+
+  const content = response.data?.choices?.[0]?.message?.content?.trim();
+  if (!content) {
+    throw new Error('Empty response from Groq');
+  }
+
+  const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  const parsed = JSON.parse(cleaned);
+
+  return {
+    skills: Array.isArray(parsed.skills) ? parsed.skills : [],
+    education: Array.isArray(parsed.education) ? parsed.education : [],
+    experience: Array.isArray(parsed.experience) ? parsed.experience : [],
+    certifications: Array.isArray(parsed.certifications) ? parsed.certifications : [],
+    links: parsed.links || {},
+    method: 'groq',
+  };
+};
+
+/**
+ * Azure OpenAI chat completion path (Secondary fallback)
  */
 const parseWithAzureOpenAI = async (rawText, config) => {
   const truncated = (rawText || '').slice(0, MAX_RAW_TEXT_LENGTH);
@@ -199,33 +262,57 @@ ${truncated}`;
 
 /**
  * Main exported resume parsing function
- * Detects runtime configuration: uses Azure OpenAI if AZURE_OPENAI_ENDPOINT is present,
- * otherwise runs rule-based fallback.
+ * Provider selection order:
+ * 1. Groq (Primary path, if GROQ_API_KEY is set)
+ * 2. Azure OpenAI (Secondary fallback, if AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_KEY are set)
+ * 3. Rule-based parsing (Final fallback if all configured providers fail or none configured)
  *
  * @param {string} rawText - Full raw text of the resume
- * @returns {Promise<{ skills: Array, education: Array, experience: Array, certifications: Array, links: Object, method: 'azure-openai' | 'rule-based' }>}
+ * @returns {Promise<{ skills: Array, education: Array, experience: Array, certifications: Array, links: Object, method: 'groq' | 'azure-openai' | 'rule-based' }>}
  */
 const parseResumeData = async (rawText) => {
-  const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
-  const apiKey = process.env.AZURE_OPENAI_KEY;
-  const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o-mini';
+  const groqApiKey = process.env.GROQ_API_KEY;
+  const azureEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
+  const azureApiKey = process.env.AZURE_OPENAI_KEY;
+  const azureDeployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o-mini';
 
-  if (endpoint && apiKey) {
+  // 1. Primary path: Groq
+  if (groqApiKey) {
     try {
-      logger.info('[ResumeParser] Parsing resume using Azure OpenAI');
-      return await parseWithAzureOpenAI(rawText, { endpoint, apiKey, deployment });
+      logger.info('[ResumeParser] Parsing resume using Groq (llama-3.3-70b-versatile)');
+      const result = await parseWithGroq(rawText, { apiKey: groqApiKey });
+      logger.info('[ResumeParser] Groq parse succeeded');
+      return result;
     } catch (err) {
-      logger.warn('[ResumeParser] Azure OpenAI parse failed, falling back to rule-based parsing:', err.message);
-      return parseWithRules(rawText);
+      logger.warn(`[ResumeParser] Groq parse failed: ${err.message}`);
     }
   }
 
-  logger.info('[ResumeParser] AZURE_OPENAI_ENDPOINT not configured, using rule-based parsing');
+  // 2. Secondary fallback: Azure OpenAI
+  if (azureEndpoint && azureApiKey) {
+    try {
+      logger.info('[ResumeParser] Parsing resume using Azure OpenAI');
+      const result = await parseWithAzureOpenAI(rawText, {
+        endpoint: azureEndpoint,
+        apiKey: azureApiKey,
+        deployment: azureDeployment,
+      });
+      logger.info('[ResumeParser] Azure OpenAI parse succeeded');
+      return result;
+    } catch (err) {
+      logger.warn(`[ResumeParser] Azure OpenAI parse failed: ${err.message}`);
+    }
+  }
+
+  // 3. Final fallback: Rule-based parsing
+  logger.info('[ResumeParser] Falling back to rule-based parsing');
   return parseWithRules(rawText);
 };
 
 module.exports = {
   parseResumeData,
+  parseWithGroq,
+  parseWithAzureOpenAI,
   parseWithRules,
   extractSections,
   extractLinks,
