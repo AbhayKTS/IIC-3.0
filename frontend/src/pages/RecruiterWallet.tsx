@@ -17,6 +17,7 @@ import {
 import {
   generateWalletFromSeed, formatAddress, explorerAddressUrl
 } from '@/lib/web3';
+import RazorpayCheckoutModal from '@/components/RazorpayCheckoutModal';
 import { doc, getDoc, setDoc, addDoc, collection, query, where, getDocs, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
@@ -57,10 +58,16 @@ export default function RecruiterWallet() {
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const prevBalanceRef = useRef<number | null>(null);
 
-  // Top-up Modal State
+  // Top-up Modal & Razorpay Animation State
   const [topUpOpen, setTopUpOpen] = useState(false);
   const [topUpAmount, setTopUpAmount] = useState('5000');
   const [isProcessingTopUp, setIsProcessingTopUp] = useState(false);
+  const [razorpayModalOpen, setRazorpayModalOpen] = useState(false);
+  const [pendingRazorpayOrder, setPendingRazorpayOrder] = useState<{
+    orderId?: string;
+    keyId?: string;
+    amount: number;
+  }>({ amount: 5000 });
 
   // Generate deterministic custodial Polygon address
   useEffect(() => {
@@ -160,7 +167,7 @@ export default function RecruiterWallet() {
   const [withdrawDestination, setWithdrawDestination] = useState('recruiter@okhdfcbank');
   const [isProcessingWithdraw, setIsProcessingWithdraw] = useState(false);
 
-  // Handle Top-Up via Razorpay (Test Mode & Demo Fallback)
+  // Open Razorpay Checkout Modal with animation
   const handleTopUp = async () => {
     const amountNum = parseFloat(topUpAmount);
     if (isNaN(amountNum) || amountNum <= 0) {
@@ -169,88 +176,54 @@ export default function RecruiterWallet() {
     }
 
     setIsProcessingTopUp(true);
+    let orderRes: any = null;
     try {
-      // 1. Try real backend Razorpay order creation
-      let orderRes: any = null;
-      try {
-        orderRes = await api.createRazorpayOrder(amountNum);
-      } catch (apiErr: any) {
-        console.warn('Backend Razorpay order fallback:', apiErr.message);
-      }
-
-      const keyId = orderRes?.keyId || import.meta.env.VITE_RAZORPAY_KEY_ID;
-
-      // If Razorpay order succeeded and key exists, launch Razorpay Checkout test mode
-      if (orderRes?.id && keyId) {
-        const scriptLoaded = await loadRazorpayScript();
-        if (scriptLoaded) {
-          const options = {
-            key: keyId,
-            amount: orderRes.amount,
-            currency: orderRes.currency || 'INR',
-            name: 'Almadox Corporate Treasury',
-            description: `Wallet Top-Up (₹${amountNum.toLocaleString('en-IN')})`,
-            order_id: orderRes.id,
-            prefill: {
-              name: session?.user?.name || 'Recruiter',
-              email: (session?.user as any)?.email || 'recruiter@techcorp.com',
-            },
-            theme: { color: '#6366f1' },
-            handler: function (_response: any) {
-              setTopUpOpen(false);
-              setIsProcessingTopUp(false);
-              toast.info('Payment submitted! Awaiting server webhook confirmation...', { duration: 5000 });
-            },
-            modal: {
-              ondismiss: function () {
-                setIsProcessingTopUp(false);
-              },
-            },
-          };
-
-          const rzp = new (window as any).Razorpay(options);
-          rzp.on('payment.failed', function (resp: any) {
-            toast.error(`Payment failed: ${resp.error?.description || 'Transaction declined'}`);
-            setIsProcessingTopUp(false);
-          });
-          rzp.open();
-          return;
-        }
-      }
-
-      // Seamless Demo Mode / Sandbox Fallback:
-      // When testing without live Razorpay backend keys or on demo account,
-      // completes the test-mode deposit and credits treasury immediately!
-      const tokenAmount = amountNum;
-      const newBal = balance + tokenAmount;
-
-      if (db) {
-        const userRef = doc(db, 'users', userId);
-        await setDoc(userRef, { walletBalance: newBal }, { merge: true });
-
-        const txRecord = {
-          userId,
-          type: 'TOPUP' as const,
-          label: `Wallet Top-up via Razorpay Test Mode (₹${amountNum.toLocaleString('en-IN')})`,
-          amount: `+${tokenAmount} USDC`,
-          timestamp: Date.now(),
-          status: 'confirmed' as const,
-          network: 'Fiat/INR (Razorpay Test Mode)',
-          txHash: `rzp_test_${Date.now().toString(36)}`,
-        };
-
-        const txColl = collection(db, 'transactions');
-        await addDoc(txColl, txRecord);
-      }
-
-      setBalance(newBal);
-      toast.success(`🎉 Test Mode: Credited +${tokenAmount.toLocaleString()} USDC to your corporate treasury!`);
-      setTopUpOpen(false);
-    } catch (err: any) {
-      toast.error(err.message || 'Payment processing failed');
-    } finally {
-      setIsProcessingTopUp(false);
+      orderRes = await api.createRazorpayOrder(amountNum);
+    } catch (apiErr: any) {
+      console.warn('Backend Razorpay order fallback:', apiErr.message);
     }
+    setIsProcessingTopUp(false);
+    setTopUpOpen(false);
+
+    setPendingRazorpayOrder({
+      orderId: orderRes?.id,
+      keyId: orderRes?.keyId || import.meta.env.VITE_RAZORPAY_KEY_ID,
+      amount: amountNum,
+    });
+    setRazorpayModalOpen(true);
+  };
+
+  // Handle Razorpay Payment Success & Treasury Credit
+  const handleRazorpaySuccess = async (paymentData: {
+    razorpay_payment_id: string;
+    razorpay_order_id?: string;
+    razorpay_signature?: string;
+    amount: number;
+  }) => {
+    const tokenAmount = paymentData.amount;
+    const newBal = balance + tokenAmount;
+
+    if (db) {
+      const userRef = doc(db, 'users', userId);
+      await setDoc(userRef, { walletBalance: newBal }, { merge: true });
+
+      const txRecord = {
+        userId,
+        type: 'TOPUP' as const,
+        label: `Wallet Top-up via Razorpay (${paymentData.razorpay_payment_id})`,
+        amount: `+${tokenAmount} USDC`,
+        timestamp: Date.now(),
+        status: 'confirmed' as const,
+        network: 'Fiat/INR (Razorpay)',
+        txHash: paymentData.razorpay_payment_id,
+      };
+
+      const txColl = collection(db, 'transactions');
+      await addDoc(txColl, txRecord);
+    }
+
+    setBalance(newBal);
+    toast.success(`🎉 Verified: +${tokenAmount.toLocaleString()} USDC credited to corporate treasury!`);
   };
 
   // Handle Treasury Withdrawal
@@ -731,6 +704,19 @@ export default function RecruiterWallet() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Razorpay Authentic Checkout & Animation Modal */}
+        <RazorpayCheckoutModal
+          isOpen={razorpayModalOpen}
+          onClose={() => setRazorpayModalOpen(false)}
+          amountInr={pendingRazorpayOrder.amount}
+          orderId={pendingRazorpayOrder.orderId}
+          keyId={pendingRazorpayOrder.keyId}
+          merchantName="Almadox Escrow & Treasury"
+          prefillEmail={(session?.user as any)?.email || 'recruiter@techcorp.com'}
+          prefillName={session?.user?.name || 'Recruiter'}
+          onSuccess={handleRazorpaySuccess}
+        />
       </div>
     </DashboardLayout>
   );

@@ -17,6 +17,7 @@ import { collection, query, orderBy, onSnapshot, addDoc } from 'firebase/firesto
 import { db } from '@/lib/firebase';
 import { saveTxRecord, explorerTxUrl } from '@/lib/web3';
 import { api } from '@/lib/mockApi';
+import RazorpayCheckoutModal from '@/components/RazorpayCheckoutModal';
 
 interface Course {
   id: string;
@@ -121,6 +122,9 @@ export default function StudentCourses() {
   const [tipTargetCourse, setTipTargetCourse] = useState<Course | null>(null);
   const [tipAmount, setTipAmount] = useState('2');
   const [isTipping, setIsTipping] = useState(false);
+  const [tipMode, setTipMode] = useState<'pol' | 'razorpay'>('razorpay');
+  const [razorpayTipOpen, setRazorpayTipOpen] = useState(false);
+  const [razorpayTipAmount, setRazorpayTipAmount] = useState(100);
 
   // Offer/Publish Course Modal
   const [publishOpen, setPublishOpen] = useState(false);
@@ -265,6 +269,26 @@ export default function StudentCourses() {
     } finally {
       setIsTipping(false);
     }
+  };
+
+  // Handle Razorpay INR Tip Success
+  const handleRazorpayTipSuccess = async (paymentData: {
+    razorpay_payment_id: string;
+    amount: number;
+  }) => {
+    if (!tipTargetCourse) return;
+
+    await api.createNotification({
+      userId: tipTargetCourse.creatorId,
+      type: 'course_tip',
+      title: `🎁 Received ₹${paymentData.amount} Razorpay Tip!`,
+      body: `${studentName} tipped you ₹${paymentData.amount} INR via Razorpay UPI on "${tipTargetCourse.title}".`,
+      meta: { courseId: tipTargetCourse.id, amount: paymentData.amount, paymentId: paymentData.razorpay_payment_id },
+    }).catch(() => null);
+
+    toast.success(`🎉 Sent ₹${paymentData.amount} tip to ${tipTargetCourse.creatorName} via Razorpay! Ref: ${paymentData.razorpay_payment_id.slice(0, 12)}`);
+    setTipOpen(false);
+    setTipTargetCourse(null);
   };
 
   return (
@@ -515,55 +539,134 @@ export default function StudentCourses() {
                 Tip Creator in Polygon (POL)
               </DialogTitle>
               <DialogDescription className="text-xs text-[#8A8F98]">
-                Reward <strong className="text-foreground">{tipTargetCourse?.creatorName}</strong> directly for this codebase walkthrough. Funds transfer on Polygon Amoy Testnet.
+                Reward <strong className="text-foreground">{tipTargetCourse?.creatorName}</strong> directly for this codebase walkthrough.
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 mt-2">
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono text-foreground font-medium">
-                  Tip Amount (POL)
-                </label>
-                <div className="relative">
-                  <Input
-                    type="number"
-                    value={tipAmount}
-                    onChange={(e) => setTipAmount(e.target.value)}
-                    placeholder="2"
-                    className="bg-[#0A0B0D] border-[#2A2D33] text-xs font-mono"
-                  />
-                  <span className="absolute right-3 top-2.5 text-xs text-violet-400 font-mono font-bold">POL</span>
-                </div>
+              {/* Payment Mode Selector */}
+              <div className="grid grid-cols-2 gap-2 bg-[#0A0B0D] p-1 rounded-lg border border-[#2A2D33]">
+                <button
+                  type="button"
+                  onClick={() => setTipMode('razorpay')}
+                  className={`py-1.5 text-xs font-mono rounded-md transition-all ${
+                    tipMode === 'razorpay'
+                      ? 'bg-blue-600 text-white font-bold shadow-sm'
+                      : 'text-muted-foreground hover:text-white'
+                  }`}
+                >
+                  ⚡ Razorpay (INR UPI)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTipMode('pol')}
+                  className={`py-1.5 text-xs font-mono rounded-md transition-all ${
+                    tipMode === 'pol'
+                      ? 'bg-violet-600 text-white font-bold shadow-sm'
+                      : 'text-muted-foreground hover:text-white'
+                  }`}
+                >
+                  🟣 Polygon (POL)
+                </button>
               </div>
 
-              {/* Presets */}
-              <div className="grid grid-cols-4 gap-2">
-                {['1', '2', '5', '10'].map((amt) => (
-                  <Button
-                    key={amt}
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setTipAmount(amt)}
-                    className={`font-mono text-xs ${
-                      tipAmount === amt ? 'border-violet-500 text-violet-400 bg-violet-500/10' : 'border-[#2A2D33]'
-                    }`}
-                  >
-                    {amt} POL
-                  </Button>
-                ))}
-              </div>
+              {tipMode === 'razorpay' ? (
+                <>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-mono text-foreground font-medium">
+                      Tip Amount (INR)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-xs text-muted-foreground font-mono">₹</span>
+                      <Input
+                        type="number"
+                        value={razorpayTipAmount}
+                        onChange={(e) => setRazorpayTipAmount(Math.max(1, parseInt(e.target.value) || 0))}
+                        placeholder="100"
+                        className="bg-[#0A0B0D] border-[#2A2D33] pl-7 text-xs font-mono"
+                      />
+                    </div>
+                  </div>
 
-              <div className="p-3 rounded-lg bg-[#0A0B0D] border border-[#2A2D33] text-xs font-mono space-y-1">
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Network:</span>
-                  <span className="text-foreground">Polygon Amoy Testnet</span>
-                </div>
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Recipient:</span>
-                  <span className="text-primary truncate max-w-[200px]">{tipTargetCourse?.creatorName}</span>
-                </div>
-              </div>
+                  {/* Presets INR */}
+                  <div className="grid grid-cols-4 gap-2">
+                    {[50, 100, 250, 500].map((amt) => (
+                      <Button
+                        key={amt}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setRazorpayTipAmount(amt)}
+                        className={`font-mono text-xs ${
+                          razorpayTipAmount === amt ? 'border-blue-500 text-blue-400 bg-blue-500/10' : 'border-[#2A2D33]'
+                        }`}
+                      >
+                        ₹{amt}
+                      </Button>
+                    ))}
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-[#0A0B0D] border border-[#2A2D33] text-xs font-mono space-y-1">
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Gateway:</span>
+                      <span className="text-blue-400 font-bold flex items-center gap-1">
+                        <ShieldCheck className="h-3.5 w-3.5" /> Razorpay Fast UPI
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Recipient:</span>
+                      <span className="text-primary truncate max-w-[200px]">{tipTargetCourse?.creatorName}</span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-mono text-foreground font-medium">
+                      Tip Amount (POL)
+                    </label>
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        value={tipAmount}
+                        onChange={(e) => setTipAmount(e.target.value)}
+                        placeholder="2"
+                        className="bg-[#0A0B0D] border-[#2A2D33] text-xs font-mono"
+                      />
+                      <span className="absolute right-3 top-2.5 text-xs text-violet-400 font-mono font-bold">POL</span>
+                    </div>
+                  </div>
+
+                  {/* Presets */}
+                  <div className="grid grid-cols-4 gap-2">
+                    {['1', '2', '5', '10'].map((amt) => (
+                      <Button
+                        key={amt}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setTipAmount(amt)}
+                        className={`font-mono text-xs ${
+                          tipAmount === amt ? 'border-violet-500 text-violet-400 bg-violet-500/10' : 'border-[#2A2D33]'
+                        }`}
+                      >
+                        {amt} POL
+                      </Button>
+                    ))}
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-[#0A0B0D] border border-[#2A2D33] text-xs font-mono space-y-1">
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Network:</span>
+                      <span className="text-foreground">Polygon Amoy Testnet</span>
+                    </div>
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Recipient:</span>
+                      <span className="text-primary truncate max-w-[200px]">{tipTargetCourse?.creatorName}</span>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             <DialogFooter className="mt-4 pt-3 border-t border-[#2A2D33]">
@@ -576,14 +679,27 @@ export default function StudentCourses() {
               >
                 Cancel
               </Button>
-              <Button
-                size="sm"
-                onClick={handleTipCreator}
-                disabled={isTipping || !tipAmount}
-                className="bg-violet-600 hover:bg-violet-500 text-white font-mono text-xs font-semibold gap-1.5"
-              >
-                {isTipping ? 'Sending on Polygon...' : `Send ${tipAmount} POL Tip`}
-              </Button>
+              {tipMode === 'razorpay' ? (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setTipOpen(false);
+                    setRazorpayTipOpen(true);
+                  }}
+                  className="bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-semibold gap-1.5 shadow-md shadow-blue-500/20"
+                >
+                  Pay ₹{razorpayTipAmount} via Razorpay
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={handleTipCreator}
+                  disabled={isTipping || !tipAmount}
+                  className="bg-violet-600 hover:bg-violet-500 text-white font-mono text-xs font-semibold gap-1.5"
+                >
+                  {isTipping ? 'Sending on Polygon...' : `Send ${tipAmount} POL Tip`}
+                </Button>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -704,6 +820,17 @@ export default function StudentCourses() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Razorpay Tip Modal with Authentic Checkout Animation */}
+        <RazorpayCheckoutModal
+          isOpen={razorpayTipOpen}
+          onClose={() => setRazorpayTipOpen(false)}
+          amountInr={razorpayTipAmount}
+          merchantName={`Tip ${tipTargetCourse?.creatorName || 'Student Creator'}`}
+          prefillEmail={(session?.user as any)?.email || 'student@university.edu'}
+          prefillName={studentName}
+          onSuccess={handleRazorpayTipSuccess}
+        />
       </div>
     </DashboardLayout>
   );
